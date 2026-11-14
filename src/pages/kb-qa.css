@@ -1,0 +1,227 @@
+/* 资料库问答：与「与 AI 讨论」同一套 agent 对话排版（消息样式来自 collab-ink.css / butler-agent.css），
+   这里只管这一栏自己的头部、引用来源、输入区间距，以及压住 resources 作用域里的通用表单样式。 */
+
+.resources-scope .kb-qa-head {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.resources-scope .kb-qa-title {
+  min-width: 0;
+  flex: 1;
+}
+.resources-scope .kb-qa-title h2 {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.resources-scope .kb-qa-title p {
+  overflow: hidden;
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 消息流：居中一栏，最长 760px；关掉滚动锚定（原因见 Butler 消息列表） */
+.resources-scope .kb-qa-scroll {
+  padding: 22px 18px 12px;
+  overflow-anchor: none;
+}
+.resources-scope .kb-qa-thread {
+  display: flex;
+  max-width: 760px;
+  flex-direction: column;
+  gap: 26px;
+  margin: 0 auto;
+}
+.resources-scope .kb-qa-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.resources-scope .kb-qa-bubble-wrap {
+  max-width: min(560px, 86%);
+}
+/* resources 作用域把 p / h3 的外边距全清零了，Markdown 的段距、标题要重新给回来 */
+.resources-scope .md > * + * {
+  margin-top: 0.7em;
+}
+.resources-scope .md :is(h3, h4) {
+  margin-top: 1.1em;
+  font-family: var(--font-display);
+}
+.resources-scope .md > :first-child {
+  margin-top: 0;
+}
+.resources-scope .md-cite {
+  vertical-align: 0.5em;
+}
+
+/* 引用来源：折叠行显示文档名，展开后按回答里的 [n] 序号列出片段 */
+.resources-scope .kb-qa-sources {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 80%, transparent);
+}
+.resources-scope .kb-qa-sources summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  color: var(--text-dim);
+  font-size: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.resources-scope .kb-qa-sources summary::-webkit-details-marker {
+  display: none;
+}
+.resources-scope .kb-qa-sources summary::before {
+  content: '◇';
+  color: var(--gold);
+  font-size: 10px;
+}
+.resources-scope .kb-qa-sources summary span {
+  overflow: hidden;
+  min-width: 0;
+  flex: 1;
+  color: var(--text-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resources-scope .kb-qa-sources ol {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 4px 12px 12px 34px;
+  border-top: 1px solid var(--line-soft);
+  list-style: decimal;
+}
+.resources-scope .kb-qa-sources li {
+  padding-top: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.resources-scope .kb-qa-sources li::marker {
+  color: var(--gold);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 11px;
+}
+.resources-scope .kb-qa-sources li b {
+  margin-right: 6px;
+  color: var(--gilt-text);
+  font-weight: 600;
+}
+/* 空状态：插画 + 一句话 + 直接能点的下一步（导入文档 / 起手问题） */
+.resources-scope .kb-qa-empty {
+  padding-top: 5vh;
+}
+.resources-scope .kb-qa-empty h2 {
+  font-size: 19px;
+}
+.resources-scope .kb-qa-empty .collab-empty-desk {
+  width: 150px;
+}
+.resources-scope .kb-qa-empty-actions,
+.resources-scope .kb-qa-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.resources-scope .kb-qa-suggest .ink-chip span {
+  color: var(--gold);
+  font-size: 10px;
+}
+
+/* 输入区：复用 Composer；把 resources 作用域给 textarea 的边框、底色、焦点外框压回去 */
+.resources-scope .kb-qa .collab-composer {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.resources-scope .kb-qa .collab-input-shell textarea {
+  min-height: 56px;
+  padding: 14px 16px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 13.5px;
+  resize: none;
+}
+.resources-scope .kb-qa .collab-input-shell textarea:focus-visible {
+  outline: none;
+}
+.resources-scope .kb-qa .collab-input-shell textarea:disabled {
+  opacity: 0.6;
+}
+/* 这一栏只有四五百像素宽：按键提示收起、模型胶囊限宽，工具条保持一行 */
+.resources-scope .kb-qa .collab-key-hint {
+  display: none;
+}
+.resources-scope .kb-qa .collab-composer-tools {
+  flex-wrap: nowrap;
+}
+.resources-scope .kb-qa .mp-trigger--pill {
+  max-width: 210px;
+}
+.resources-scope .kb-qa-scope {
+  display: inline-flex;
+  min-width: 0;
+  max-width: 220px;
+  height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px 0 9px;
+  border: 1px solid color-mix(in srgb, var(--gold) 24%, var(--line));
+  border-radius: 999px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.resources-scope .kb-qa-scope svg {
+  flex: 0 0 auto;
+  color: var(--gold);
+}
+.resources-scope .kb-qa-scope span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.resources-scope .kb-qa-scope small {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.resources-scope .kb-qa-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border: 1px dashed color-mix(in srgb, var(--gold) 32%, var(--line));
+  border-radius: 10px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.resources-scope .kb-qa-notice.is-error {
+  border-color: color-mix(in srgb, var(--seal) 45%, transparent);
+  color: var(--seal);
+}
+.resources-scope .kb-qa-footnote {
+  flex: 0 0 auto;
+  padding: 0 18px 12px;
+  color: var(--text-faint);
+  font-size: 11px;
+  text-align: center;
+}

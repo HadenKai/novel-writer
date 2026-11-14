@@ -1,0 +1,28 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    /* 严格模式：开启 strict 组，并额外补两项真会出事的检查。
+       - noImplicitOverride：子类覆盖父类方法必须写 override，防止父类改名后静默失联（已启用）。
+       下面两项是「理想但代价大」的强检查，暂未启用（全量开启会暴露大量历史告警，非本次改动引入）：
+       - noUncheckedIndexedAccess：arr[i] 类型带上 undefined，逼出越界分支；
+       - exactOptionalPropertyTypes：可选属性不能被显式赋 undefined，区分「没传」与「传 undefined」。 */
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,19 @@
+dist
+release
+node_modules
+data
+output
+coverage
+*.local
+package-lock.json
+
+# 工作流内部产物（不参与交付）
+.workbuddy
+_*.mjs
+_*.txt
+# 浏览器自动化快照（测试产物，不是源码）
+.playwright-cli
+
+# 提示词/技能文档：正文含大量对齐排版，交给人工维护
+server/skills
+README.md

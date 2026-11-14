@@ -1,0 +1,26 @@
+# 依赖与构建产物
+node_modules
+dist
+output
+release
+
+# 运行时数据（作品 / 模型密钥 / 日志均在数据目录，绝不入库）
+data
+*.local
+
+# 日志与系统文件
+*.log
+logs
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器与工具缓存
+.vscode
+.idea
+*.swp
+.playwright-cli
+.ui-review
+# 工具产物（不入库）
+.workbuddy
+docs/share-checklist.md

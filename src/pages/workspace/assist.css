@@ -1,0 +1,157 @@
+/* AI 设定助手：设定工作台右栏。这里不直接调用模型，问题交给「与 AI 讨论」处理。 */
+.plan-assist {
+  position: sticky;
+  top: 18px;
+  flex-direction: column;
+  min-width: 0;
+  height: min(calc(100vh - 110px), 760px);
+  min-height: 460px;
+  overflow: hidden;
+}
+.plan-assist__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 10px 12px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.plan-assist__title {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+}
+.plan-assist__title svg {
+  color: var(--gold);
+}
+.plan-assist__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  padding: 16px 14px 12px;
+  overflow-y: auto;
+}
+.plan-assist__intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.plan-assist__bubble {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.plan-assist__bubble::before {
+  content: '';
+  position: absolute;
+  top: 14px;
+  left: -6px;
+  width: 10px;
+  height: 10px;
+  border-left: 1px solid rgba(110, 84, 44, 0.22);
+  border-bottom: 1px solid rgba(110, 84, 44, 0.22);
+  background: var(--paper);
+  transform: rotate(45deg);
+}
+.plan-assist__bubble p {
+  margin: 0;
+}
+.plan-assist__bubble ul {
+  margin: 6px 0 0;
+  padding-left: 1.1em;
+  color: var(--paper-dim);
+  list-style: '· ';
+}
+.plan-assist__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.plan-assist__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 13px;
+  border: 1px solid color-mix(in srgb, var(--gold) 50%, transparent);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--gold);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.plan-assist__chip:hover {
+  border-color: var(--gold);
+  background: var(--gold-soft);
+}
+.plan-assist__form {
+  padding: 12px 14px 14px;
+  border-top: 1px solid var(--line-soft);
+}
+.plan-assist__box {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel2);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.plan-assist__box:focus-within {
+  border-color: color-mix(in srgb, var(--gold) 70%, transparent);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.planning-page .plan-assist__input {
+  display: block;
+  width: 100%;
+  min-height: 108px;
+  padding: 11px 12px 40px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.7;
+  resize: none;
+}
+.planning-page .plan-assist__input:focus,
+.planning-page .plan-assist__input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.plan-assist__input::placeholder {
+  color: var(--text-faint);
+}
+.plan-assist__send {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-sm);
+  color: var(--gold);
+}
+.plan-assist__send:hover:not(:disabled) {
+  background: var(--gold-soft);
+}
+.plan-assist__note {
+  margin: 8px 2px 0;
+  color: var(--text-faint);
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+.plan-assist__note.is-error {
+  color: var(--seal);
+}

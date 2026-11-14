@@ -1,0 +1,966 @@
+/* 应用外壳：左侧竖排字标 + 鎏金导航，顶栏承载书名与作品工作区页签。页面滚动区在 .shell-content 内。 */
+.desktop-shell {
+  position: relative;
+  display: flex;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  isolation: isolate;
+}
+/* 墨晕：画布右上一团极淡的暖光、左下一团冷墨，只在外壳上画一次 */
+.desktop-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(900px 520px at 92% -10%, color-mix(in srgb, var(--gold) 7%, transparent), transparent 70%),
+    radial-gradient(760px 480px at 0% 110%, color-mix(in srgb, var(--jade) 5%, transparent), transparent 70%);
+}
+
+/* ---------- 侧栏 ---------- */
+.shell-sidebar {
+  position: relative;
+  width: 232px;
+  flex: 0 0 232px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, var(--rail), color-mix(in srgb, var(--rail) 80%, var(--bg)));
+  border-right: 1px solid var(--line);
+  /* 侧栏不起 view-transition-name：不截图、不参与转场，切页时始终是真实元素、可以直接点 */
+  transition:
+    width 180ms ease,
+    flex-basis 180ms ease;
+}
+.shell-brand {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 30px 16px 20px;
+  flex-shrink: 0;
+}
+.shell-brand-name {
+  writing-mode: vertical-rl;
+  font-family: var(--font-display);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  color: var(--text);
+  text-shadow: 0 1px 14px color-mix(in srgb, var(--gold) 16%, transparent);
+  white-space: nowrap;
+}
+.shell-brand::after {
+  content: '';
+  width: 64%;
+  height: 1px;
+  margin-top: 4px;
+  background: linear-gradient(90deg, transparent, var(--line-gold), transparent);
+}
+.shell-navigation {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px 14px 16px;
+}
+/* 侧栏滚动条：一道 4px 细金线，平时很淡，提示「还能往下滚」；移进侧栏变亮。
+   不写 scrollbar-width（原因见 index.css）。 */
+.shell-navigation::-webkit-scrollbar {
+  width: 6px;
+}
+.shell-navigation::-webkit-scrollbar-thumb,
+.dark .shell-navigation::-webkit-scrollbar-thumb {
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  background-clip: padding-box;
+}
+.shell-navigation:hover::-webkit-scrollbar-thumb,
+.dark .shell-navigation:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--gold) 36%, transparent);
+  background-clip: padding-box;
+}
+.shell-navigation::-webkit-scrollbar-thumb:hover,
+.dark .shell-navigation::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--gold) 55%, transparent);
+  background-clip: padding-box;
+}
+.shell-group-label {
+  margin-top: 20px;
+  padding: 0 12px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--text-faint);
+}
+.shell-nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  margin: 3px 0;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--text-dim);
+  font-size: 14px;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease;
+}
+.shell-nav-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  color: var(--text-faint);
+  transition: color 140ms ease;
+}
+.shell-nav-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.shell-nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.shell-nav-item:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.shell-nav-item:hover .shell-nav-icon {
+  color: var(--text-dim);
+}
+/* 当前位置：鎏金渐变底 + 金线细框，图标转金 */
+.shell-nav-item.is-active {
+  border-color: color-mix(in srgb, var(--gold) 46%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--gold) 34%, transparent),
+    color-mix(in srgb, var(--gold) 9%, transparent) 78%
+  );
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 0 22px -12px color-mix(in srgb, var(--gold) 80%, transparent);
+}
+:root:not(.dark) .shell-nav-item.is-active {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--gold) 26%, transparent),
+    color-mix(in srgb, var(--gold) 6%, transparent) 78%
+  );
+}
+.shell-nav-item.is-active .shell-nav-icon {
+  color: var(--gold);
+}
+/* 最近作品：书名首字小印 */
+.shell-monogram {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.shell-nav-item.is-active .shell-monogram {
+  border-color: color-mix(in srgb, var(--gold) 70%, transparent);
+}
+.shell-sidebar-note {
+  margin: 4px 12px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-faint);
+}
+/* 侧栏底部：远山 + 连续写作天数 */
+.shell-sidebar-footer {
+  position: relative;
+  flex-shrink: 0;
+  padding: 18px 14px 14px;
+  border-top: 1px solid var(--line-soft);
+  overflow: hidden;
+}
+.shell-sidebar-art {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 110px;
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+.shell-streak {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.shell-streak-label {
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  color: var(--text-dim);
+}
+.shell-streak-value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  color: var(--gold);
+}
+.shell-streak-value .ink-num {
+  font-size: 28px;
+  line-height: 1.1;
+}
+.shell-streak-value small {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.shell-streak-value::before,
+.shell-streak-value::after {
+  content: '';
+  align-self: center;
+  width: 18px;
+  height: 1px;
+  background: var(--line-gold);
+}
+.shell-storage-note {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 10px;
+  color: var(--text-faint);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.shell-storage-note > span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--jade);
+}
+
+/* ---------- 主区与顶栏 ---------- */
+.shell-main {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+.shell-toolbar {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  height: 56px;
+  flex: 0 0 56px;
+  padding: 0 0 0 18px;
+  gap: 16px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 82%, var(--rail));
+  /* 工具栏同侧栏：不截图、不参与转场 */
+}
+/* 作品库：顶栏透明无线，与页头的远山连成一片 */
+.desktop-shell[data-route='home'] .shell-toolbar {
+  border-bottom-color: transparent;
+  background: transparent;
+}
+.shell-toolbar-art {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: min(560px, 46%);
+  height: 56px;
+  color: var(--text-faint);
+  opacity: 0.55;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%);
+  mask-image: linear-gradient(90deg, transparent, #000 45%);
+}
+.shell-toolbar > :not(.shell-toolbar-art) {
+  position: relative;
+  z-index: 1;
+}
+.shell-toolbar-leading,
+.shell-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.shell-toolbar-actions {
+  flex-shrink: 0;
+  gap: 6px;
+}
+.shell-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.shell-breadcrumb > span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.shell-section {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+.shell-book-title {
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+.shell-breadcrumb > .shell-book-seal {
+  overflow: visible;
+}
+.shell-book-genre {
+  padding-left: 12px;
+  border-left: 1px solid var(--line-strong);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+/* 作品工作区页签：并入顶栏，当前区为鎏金字 + 发光短线 */
+.shell-toolbar-tabs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.shell-toolbar-tabs::-webkit-scrollbar {
+  display: none;
+}
+.shell-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+.shell-tab svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.shell-tab::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi), var(--gold-lo));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--gold) 70%, transparent);
+  opacity: 0;
+  transform: scaleX(0.4);
+  transition:
+    opacity 160ms ease,
+    transform 220ms var(--ease);
+}
+.shell-tab:hover {
+  color: var(--text);
+}
+.shell-tab.is-active {
+  color: var(--gold);
+  font-weight: 600;
+}
+.shell-tab.is-active svg {
+  opacity: 1;
+}
+.shell-tab.is-active::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+.shell-tab:focus-visible {
+  outline-offset: -4px;
+}
+.shell-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-md);
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.shell-icon-button:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.shell-toolbar :is(button, a):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+.shell-search-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  min-width: 196px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.shell-search-button kbd {
+  margin-left: auto;
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.shell-search-button:hover {
+  border-color: var(--line-strong);
+  color: var(--text-dim);
+}
+/* 自绘窗口按钮：撑满顶栏高度 */
+.shell-window-controls {
+  display: flex;
+  align-items: stretch;
+  align-self: stretch;
+  margin-left: 6px;
+}
+.shell-window-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  color: var(--text-faint);
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+.shell-window-btn:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.shell-window-close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+.shell-toolbar-actions:not(:has(.shell-window-controls)) {
+  padding-right: 18px;
+}
+.shell-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  outline: none;
+  /* 转场只作用在内容区：侧栏与工具栏保持原位 */
+  view-transition-name: app-content;
+}
+.shell-mobile-toggle,
+.shell-mobile-close,
+.shell-scrim {
+  display: none;
+}
+.shell-skip {
+  position: fixed;
+  left: 16px;
+  top: -60px;
+  z-index: 300;
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--gold);
+  color: var(--gold-contrast);
+}
+.shell-skip:focus {
+  top: 12px;
+}
+/* ---------- 收起的侧栏：72px 图标栏，图标下带小字 ---------- */
+.nav-compact .shell-sidebar {
+  width: 76px;
+  flex-basis: 76px;
+}
+.nav-compact .shell-brand {
+  padding: 18px 0 14px;
+}
+.nav-compact .shell-brand-name,
+.nav-compact .shell-group-label,
+.nav-compact .shell-sidebar-note,
+.nav-compact .shell-storage-note,
+.nav-compact .shell-streak-label,
+.nav-compact .shell-streak-value small,
+.nav-compact .shell-streak-value::before,
+.nav-compact .shell-streak-value::after {
+  display: none;
+}
+.nav-compact .shell-navigation {
+  padding: 4px 8px 12px;
+}
+.nav-compact .shell-nav-item {
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 6px 2px;
+}
+.nav-compact .shell-nav-label {
+  max-width: 100%;
+  font-size: 11px;
+  font-weight: 500;
+}
+.nav-compact .shell-sidebar-footer {
+  padding: 12px 4px 16px;
+}
+.nav-compact .shell-sidebar-art {
+  display: none;
+}
+.nav-compact .shell-streak-value .ink-num {
+  font-size: 20px;
+}
+.nav-compact .shell-streak::after {
+  content: '天';
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.focus-mode:not(.nav-open) .shell-sidebar {
+  display: none;
+}
+.focus-mode .shell-desktop-toggle {
+  visibility: hidden;
+}
+
+/* ---------- 弹层外壳（ModalShell） ---------- */
+/* 大面积遮罩不做 backdrop 模糊：软件合成（远程桌面 / 虚拟显示器）下每帧整屏重算，
+   弹窗滚动与开合会直接卡死。改为加深的实色压暗保持层次。 */
+.ui-modal-overlay {
+  background: rgb(4 5 6 / 72%);
+  /* 只动 opacity（不动 transform）：遮罩淡入，且不会成为 fixed 后代的包含块 */
+  animation: dlg-fade 0.2s var(--ease) backwards;
+}
+:root:not(.dark) .ui-modal-overlay {
+  background: rgb(40 30 18 / 36%);
+}
+.ui-modal-panel {
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-xl);
+  box-shadow: var(--sh-4);
+}
+.ui-modal-header {
+  align-items: center;
+}
+.ui-modal-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+
+/* ---------- 命令面板（components/CommandPalette）---------- */
+.cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 14vh 24px 24px;
+  background: rgb(4 5 6 / 68%);
+}
+:root:not(.dark) .cmdk-overlay {
+  background: rgb(40 30 18 / 34%);
+}
+.cmdk {
+  display: flex;
+  flex-direction: column;
+  width: 600px;
+  max-width: 100%;
+  max-height: 70vh;
+  overflow: hidden;
+  border: 1px solid var(--line-gold);
+  border-radius: var(--r-xl);
+  background: var(--panel);
+  box-shadow: var(--sh-4);
+  animation: dlg-pop 0.24s var(--ease-jelly) backwards;
+}
+.cmdk-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 18px 12px 22px;
+}
+.cmdk-shortcut {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.cmdk-close {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-sm);
+  color: var(--text-faint);
+}
+.cmdk-close:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.cmdk-search {
+  margin: 0 18px 8px;
+  min-height: 42px;
+}
+.cmdk-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 10px 10px;
+}
+.cmdk-group {
+  padding: 12px 12px 6px;
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  color: var(--text-dim);
+  font-size: 13.5px;
+  text-align: left;
+}
+.cmdk-item svg {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+.cmdk-item.is-active {
+  border-color: color-mix(in srgb, var(--gold) 30%, transparent);
+  background: var(--active);
+  color: var(--text);
+}
+.cmdk-item.is-active svg {
+  color: var(--gold);
+}
+.cmdk-label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cmdk-hint {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.cmdk-kbd {
+  flex-shrink: 0;
+  min-width: 52px;
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.cmdk-empty {
+  padding: 32px 12px;
+  color: var(--text-faint);
+  font-size: 13px;
+  text-align: center;
+}
+.cmdk-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 22px;
+  border-top: 1px solid var(--line-soft);
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.cmdk-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmdk {
+    animation: none;
+  }
+}
+
+/* ---------- 轻提示（components/Toast）：右下角，左侧色条 + 图标圈 ---------- */
+.ink-toast-host {
+  pointer-events: none;
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: min(420px, calc(100vw - 48px));
+}
+.ink-toast {
+  pointer-events: auto;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 100%;
+  min-height: 52px;
+  padding: 10px 14px 10px 18px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 13.5px;
+  line-height: 1.6;
+  text-align: left;
+  box-shadow: var(--sh-4);
+  cursor: pointer;
+}
+.ink-toast::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--toast-tone);
+}
+.ink-toast__icon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--toast-tone) 18%, transparent);
+  color: var(--toast-tone);
+}
+.ink-toast__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ink-toast__close {
+  flex-shrink: 0;
+  margin-left: 6px;
+  color: var(--text-faint);
+}
+.ink-toast:hover .ink-toast__close {
+  color: var(--text);
+}
+@media (max-width: 640px) {
+  .ink-toast-host {
+    left: 16px;
+    right: 16px;
+    bottom: 16px;
+    align-items: stretch;
+    max-width: none;
+  }
+}
+.ui-modal-close {
+  height: 30px;
+  width: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-sm);
+}
+.ui-modal-close:hover {
+  background: var(--hover);
+}
+
+/* ---------- 窄窗口：侧栏改为抽屉 ---------- */
+@media (max-width: 1023px) {
+  .shell-sidebar,
+  .nav-compact .shell-sidebar {
+    display: flex;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: 248px;
+    z-index: 60;
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    box-shadow: var(--sh-4);
+  }
+  .nav-open .shell-sidebar {
+    transform: translateX(0);
+  }
+  .nav-compact .shell-brand {
+    padding: 30px 16px 20px;
+  }
+  .nav-compact .shell-brand-name,
+  .nav-compact .shell-group-label,
+  .nav-compact .shell-streak-label {
+    display: block;
+  }
+  .nav-compact .shell-storage-note {
+    display: flex;
+  }
+  .nav-compact .shell-streak-value small,
+  .nav-compact .shell-sidebar-art {
+    display: block;
+  }
+  .nav-compact .shell-streak-value::before,
+  .nav-compact .shell-streak-value::after {
+    display: block;
+  }
+  .nav-compact .shell-streak::after {
+    content: none;
+  }
+  .nav-compact .shell-streak-value .ink-num {
+    font-size: 28px;
+  }
+  .nav-compact .shell-nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: 42px;
+    padding: 0 12px;
+  }
+  .nav-compact .shell-nav-label {
+    font-size: 14px;
+  }
+  .shell-mobile-close {
+    display: flex;
+    position: absolute;
+    top: 12px;
+    right: 10px;
+  }
+  .shell-desktop-toggle {
+    display: none;
+  }
+  .shell-mobile-toggle {
+    display: flex;
+  }
+  .shell-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgb(0 0 0 / 46%);
+    z-index: 50;
+  }
+  .shell-toolbar {
+    padding-left: 10px;
+  }
+  .shell-toolbar-art {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .shell-book-genre {
+    display: none;
+  }
+  .shell-tab {
+    padding: 0 10px;
+  }
+}
+@media (max-width: 640px) {
+  .shell-search-button {
+    min-width: 34px;
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+  }
+  .shell-search-button span,
+  .shell-search-button kbd {
+    display: none;
+  }
+  .shell-toolbar-leading {
+    gap: 8px;
+  }
+  .shell-toolbar-actions {
+    gap: 2px;
+  }
+  .shell-tab svg {
+    display: none;
+  }
+  .shell-book-title {
+    font-size: 16px;
+  }
+}
+/* 矮窗口：压缩竖排字标，给导航留出空间 */
+@media (max-height: 780px) {
+  .shell-brand {
+    gap: 10px;
+    padding: 18px 16px 12px;
+  }
+  .shell-brand-name {
+    font-size: 22px;
+  }
+  .shell-sidebar-art {
+    height: 80px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .shell-sidebar,
+  .shell-tab::after {
+    transition: none;
+  }
+}
+
+/* 触控设备上图标按钮扩展到 44px 点击目标；桌面鼠标布局保持紧凑。 */
+@media (hover: none), (pointer: coarse) {
+  .shell-icon-button,
+  .shell-search-button,
+  .ui-modal-close,
+  .writing-tool,
+  .writing-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .shell-mobile-close {
+    width: 44px;
+    height: 44px;
+  }
+}

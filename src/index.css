@@ -1,0 +1,1044 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 墨金：墨黑外壳、炭黑面板、宣纸稿面；鎏金只做细线与重点，朱砂只做印与警示。
+   设计规范见 docs/ink-design.md。深色为默认主题，浅色是「宣纸」日间版本。 */
+html {
+  background: #efe9dd;
+}
+html.dark {
+  background: #0c0d0f;
+}
+
+/* 仅供屏幕阅读器：视觉上不可见，但仍留在无障碍树里。
+   用于给纯图标/视觉性文案补语义（如 radio 组的 legend）。 */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ===== 语义令牌 =====
+   :root 是浅色「宣纸」，.dark 是默认的「墨黑」。组件只用语义令牌，不写死色值。
+   --gold 鎏金：细线、选中、主按钮、关键数字；--seal 朱砂：印章与危险；--jade 竹青：成功与本地。
+   --paper* 是稿面（正文纸张）专用，深浅主题下都是暖宣纸，墨色文字。 */
+:root {
+  color-scheme: light;
+  --bg-glow: none;
+  --bg: #efe9dd;
+  --bg-deep: #e6dfd1;
+  --rail: #e8e1d3;
+  --panel: #f8f4ec;
+  --panel2: #f0eadf;
+  --panel3: #e6dfd2;
+  --line: rgba(122, 92, 48, 0.2);
+  --line-soft: rgba(122, 92, 48, 0.12);
+  --line-strong: rgba(122, 92, 48, 0.42);
+  --line-gold: rgba(141, 106, 51, 0.46);
+  --text: #231f19;
+  --text-dim: #5c5446;
+  --text-faint: #6f6657;
+  --gold: #8d6a33;
+  --gold-deep: #74562a;
+  --gold-soft: rgba(141, 106, 51, 0.14);
+  --gold-hi: #e2c588;
+  --gold-lo: #b58a45;
+  /* 金色「文字」专用：浅色主题下 gold-hi 是淡金，直接当文字色在纸底上对比度仅约 1.7:1，
+     故文字一律用 gold-text（浅色=深金、深色=亮金）；gold-hi 只用于渐变/高光面 */
+  --gold-text: var(--gold-deep);
+  --gold-contrast: #1c160c;
+  /* 按钮「烫金墨块」：浅色主题是宣纸上的淡金面 + 金线 + 深金字 */
+  --gilt-top: color-mix(in srgb, var(--gold) 13%, var(--panel));
+  --gilt-bottom: color-mix(in srgb, var(--gold) 22%, var(--panel));
+  --gilt-line: color-mix(in srgb, var(--gold) 62%, transparent);
+  --gilt-text: var(--gold-deep);
+  --gilt-glow: color-mix(in srgb, var(--gold) 22%, transparent);
+  --seal: #a6402e;
+  --seal-fill: #b0402d;
+  --jade: #3f6a55;
+  --amber: #8a6528;
+  --ink: #1a1712;
+  --hover: rgba(122, 92, 48, 0.07);
+  --active: rgba(141, 106, 51, 0.13);
+  --paper: #f4ecdb;
+  --paper-2: #ebe1cc;
+  --paper-ink: #2a241c;
+  --paper-dim: #5a4f40;
+  --paper-faint: #716553;
+  --paper-line: rgba(90, 68, 36, 0.18);
+  --font-ui:
+    'Noto Sans SC', 'Source Han Sans SC', 'HarmonyOS Sans SC', 'Microsoft YaHei UI', 'Microsoft YaHei', 'PingFang SC',
+    system-ui, sans-serif;
+  --font-display:
+    'Noto Serif SC Variable', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', SimSun, serif;
+  --font-reading:
+    'Noto Serif SC Variable', 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', SimSun, serif;
+  --font-num: 'Noto Serif SC Variable', 'Noto Serif SC', Georgia, serif;
+  --font-mono: 'Cascadia Mono', Consolas, 'SF Mono', ui-monospace, monospace;
+}
+.dark {
+  color-scheme: dark;
+  --bg-glow: none;
+  --bg: #0c0d0f;
+  --bg-deep: #08090a;
+  --rail: #101114;
+  --panel: #15171b;
+  --panel2: #1b1e23;
+  --panel3: #23272d;
+  --line: rgba(198, 161, 91, 0.16);
+  --line-soft: rgba(198, 161, 91, 0.09);
+  --line-strong: rgba(198, 161, 91, 0.32);
+  --line-gold: rgba(198, 161, 91, 0.5);
+  --text: #ede7da;
+  --text-dim: #b7ae9e;
+  --text-faint: #8f877a;
+  --gold: #c6a15b;
+  --gold-deep: #dcbc7c;
+  --gold-soft: rgba(198, 161, 91, 0.13);
+  --gold-hi: #e3c789;
+  --gold-lo: #b08a47;
+  --gold-text: var(--gold-hi);
+  --gold-contrast: #17120a;
+  /* 深色主题：墨块底 + 鎏金细框 + 金字，悬停时金线提亮、内里泛一层淡金 */
+  --gilt-top: color-mix(in srgb, var(--gold) 15%, var(--panel));
+  --gilt-bottom: color-mix(in srgb, var(--gold) 6%, var(--bg));
+  --gilt-line: color-mix(in srgb, var(--gold) 70%, transparent);
+  --gilt-text: var(--gold-hi);
+  --gilt-glow: color-mix(in srgb, var(--gold) 30%, transparent);
+  --seal: #d76a55;
+  --seal-fill: #b8412f;
+  --jade: #86a796;
+  --amber: #d2ac63;
+  --ink: #060708;
+  --hover: rgba(237, 231, 218, 0.045);
+  --active: rgba(198, 161, 91, 0.12);
+  --paper: #ede6d6;
+  --paper-2: #e2d9c5;
+  --paper-ink: #29231b;
+  --paper-dim: #5b5041;
+  --paper-faint: #6f6352;
+  --paper-line: rgba(90, 68, 36, 0.2);
+}
+
+/* 宣纸稿面上的局部令牌：气泡、稿纸、候选稿等嵌在纸面上的组件继续用语义令牌即可。 */
+.ink-on-paper {
+  color-scheme: light;
+  --panel: #f6efe0;
+  --panel2: #ebe1cc;
+  --panel3: #e0d5bd;
+  --line: rgba(90, 68, 36, 0.2);
+  --line-soft: rgba(90, 68, 36, 0.12);
+  --line-strong: rgba(90, 68, 36, 0.36);
+  --text: var(--paper-ink);
+  --text-dim: var(--paper-dim);
+  --text-faint: var(--paper-faint);
+  --gold: #85622c;
+  --gold-deep: #6c4f22;
+  --gold-soft: rgba(133, 98, 44, 0.14);
+  --seal: #a13a28;
+  --jade: #3b6551;
+  --amber: #85602a;
+  --hover: rgba(90, 68, 36, 0.07);
+  --active: rgba(133, 98, 44, 0.14);
+  /* 纸面上的按钮按浅色那套重新计算（深色主题下继承来的是墨块配色） */
+  --gilt-top: color-mix(in srgb, var(--gold) 13%, var(--panel));
+  --gilt-bottom: color-mix(in srgb, var(--gold) 22%, var(--panel));
+  --gilt-line: color-mix(in srgb, var(--gold) 62%, transparent);
+  --gilt-text: var(--gold-deep);
+  --gilt-glow: color-mix(in srgb, var(--gold) 22%, transparent);
+  color: var(--paper-ink);
+}
+
+/* ===== 圆角 / 阴影 / 动效 ===== */
+:root {
+  --r-xs: 4px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 10px;
+  --r-xl: 12px;
+  --r-pill: 999px;
+
+  /* 克制的投影：只承担层级，不制造装饰；带一点暖色，避免压在纸面发灰 */
+  --sh-1: 0 1px 2px rgba(48, 37, 24, 0.06);
+  --sh-2: 0 1px 2px rgba(48, 37, 24, 0.06), 0 6px 16px -8px rgba(48, 37, 24, 0.16);
+  --sh-3: 0 2px 6px rgba(48, 37, 24, 0.08), 0 14px 32px -12px rgba(48, 37, 24, 0.22);
+  --sh-4: 0 10px 22px -8px rgba(48, 37, 24, 0.22), 0 28px 60px -20px rgba(48, 37, 24, 0.32);
+  /* 稿纸投在桌面上的影：深色主题下是「一张纸放在深色书桌上」 */
+  --sh-paper: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 14px 36px -14px rgba(48, 37, 24, 0.3);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-jelly: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --t-fast: 120ms;
+  --t-base: 180ms;
+  --t-press: 90ms;
+  --t-jelly: 160ms;
+}
+
+.dark {
+  /* 墨黑底上只用阴影暗示层级；面板顶边一道极淡的高光让炭黑卡片从墨底里浮出来 */
+  --sh-1: 0 1px 0 rgba(255, 244, 222, 0.025) inset, 0 1px 2px rgba(0, 0, 0, 0.4);
+  --sh-2: 0 1px 0 rgba(255, 244, 222, 0.03) inset, 0 8px 22px -10px rgba(0, 0, 0, 0.6);
+  --sh-3: 0 2px 8px rgba(0, 0, 0, 0.42), 0 18px 44px -16px rgba(0, 0, 0, 0.7);
+  --sh-4: 0 14px 36px -12px rgba(0, 0, 0, 0.72), 0 40px 90px -28px rgba(0, 0, 0, 0.8);
+  --sh-paper: 0 1px 0 rgba(255, 255, 255, 0.35) inset, 0 26px 70px -24px rgba(0, 0, 0, 0.85);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  letter-spacing: 0;
+  transition:
+    background 0.25s ease,
+    color 0.25s ease;
+}
+
+#root {
+  position: relative;
+}
+
+/* 历史遗留类名：界面框架一律无衬线；衬线只用于标题与小说正文（.font-song/.font-kai） */
+.serif {
+  font-family: var(--font-ui);
+}
+
+.kai {
+  font-family: 'KaiTi', 'Kaiti SC', 'STKaiti', 'Songti SC', serif;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.02em;
+}
+
+.font-song {
+  font-family: var(--font-reading);
+}
+.font-hei {
+  font-family: var(--font-ui);
+  letter-spacing: 0;
+}
+.font-kai {
+  font-family: 'KaiTi', 'Kaiti SC', 'STKaiti', 'KaiTi_GB2312', 'Songti SC', serif;
+}
+
+/* 数字：工具区的小数字（字数、时间）用等宽对齐；统计大数字用 .ink-num（衬线） */
+.mono {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* 阅读区细滚动条。
+   注意：不要写 scrollbar-width / scrollbar-color —— Chromium 121+ 一旦看到这两个标准属性，
+   就会整体忽略下面的 ::-webkit-scrollbar 定制，退回带上下箭头的系统滚动条。 */
+.reader-scroll {
+  overscroll-behavior: contain;
+}
+.reader-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--gold) 26%, transparent);
+}
+.dark ::selection {
+  background: color-mix(in srgb, var(--gold) 34%, transparent);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(122, 92, 48, 0.28);
+  border-radius: 8px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(122, 92, 48, 0.45);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(198, 161, 91, 0.2);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(198, 161, 91, 0.36);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ===== 稿纸底色：深浅主题下都是纸，文字用 --paper-ink（配合 .ink-on-paper）===== */
+.paper-warm {
+  background: var(--paper);
+}
+.paper-green {
+  background: #e4e8dc;
+}
+.paper-rose {
+  background: #efe1dc;
+}
+.paper-plain {
+  background: #f7f3ea;
+}
+
+/* ===== 全局输入聚焦：细边框 + 克制光环 ===== */
+input,
+select,
+textarea {
+  transition:
+    border-color var(--t-fast) ease,
+    box-shadow var(--t-fast) ease,
+    background var(--t-fast) ease;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--gold) 65%, var(--line)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 16%, transparent);
+}
+
+/* ============================================================
+   按钮体系：扁平、矩形微圆角、明确按压
+   ============================================================ */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border-radius: var(--r-md);
+  border: 1px solid transparent;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease),
+    transform var(--t-jelly) var(--ease-jelly);
+}
+
+.btn:active:not(:disabled) {
+  /* 按下的位移统一由文末「所有可点元素 scale(0.97)」规则提供，这里只保留过渡 timing */
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease),
+    transform var(--t-press) var(--ease);
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 24%, transparent);
+}
+
+.btn:disabled,
+.btn[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.4;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* 按钮「烫金墨块」（设计板见 docs/ink-design.md）：
+   主按钮不再是整块金条，而是墨块 + 鎏金细框 + 金字，层级靠金线亮度与内晕拉开；
+   次级是无框的炭黑块，描边是透明底金线，危险是朱砂墨块。 */
+.btn--primary {
+  background: linear-gradient(180deg, var(--gilt-top), var(--gilt-bottom));
+  color: var(--gilt-text);
+  border-color: var(--gilt-line);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--gold-hi) 16%, transparent);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.btn--primary:hover:not(:disabled) {
+  border-color: var(--gold);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--gold-hi) 22%, transparent),
+    inset 0 0 14px var(--gilt-glow),
+    0 0 0 3px color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.btn--primary:active:not(:disabled) {
+  background: color-mix(in srgb, var(--gold) 20%, var(--panel));
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.28);
+}
+
+/* 次级按钮：炭黑墨块，只有一道极淡的线，悬停泛暖 */
+.btn--ghost {
+  background: var(--panel2);
+  color: var(--text);
+  border-color: var(--line-soft);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--gold) 8%, var(--panel3));
+  color: var(--text);
+  border-color: var(--line);
+}
+
+/* 描边按钮：透明底 + 鎏金细线 */
+.btn--outline {
+  background: transparent;
+  color: var(--gilt-text);
+  border-color: color-mix(in srgb, var(--gold) 48%, transparent);
+}
+.btn--outline:hover:not(:disabled) {
+  background: var(--gold-soft);
+  border-color: var(--gilt-line);
+}
+
+/* 危险按钮：朱砂墨块；确认弹窗里改为朱砂实底（.btn--danger-solid） */
+.btn--danger {
+  background: color-mix(in srgb, var(--seal-fill) 14%, var(--panel));
+  color: var(--seal);
+  border-color: color-mix(in srgb, var(--seal) 38%, transparent);
+}
+.btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--seal-fill) 24%, var(--panel));
+  border-color: color-mix(in srgb, var(--seal) 62%, transparent);
+}
+.btn--danger-solid {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--seal-fill) 88%, #fff), var(--seal-fill));
+  color: #fff4ec;
+  border-color: color-mix(in srgb, var(--seal) 70%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 200, 0.2);
+}
+.btn--danger-solid:hover:not(:disabled) {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 200, 0.24),
+    0 0 0 3px color-mix(in srgb, var(--seal) 16%, transparent);
+}
+
+/* 尺寸 */
+.btn--sm {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12.5px;
+}
+.btn--md {
+  height: 36px;
+  padding: 0 16px;
+  font-size: 13px;
+}
+.btn--lg {
+  height: 42px;
+  padding: 0 22px;
+  font-size: 14px;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(.btn) {
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease),
+    transform var(--t-jelly) var(--ease-jelly);
+}
+button:not(.btn):active:not(:disabled) {
+  transform: none;
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
+    opacity var(--t-fast) var(--ease),
+    transform var(--t-press) var(--ease);
+}
+button:not(.btn):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 24%, transparent);
+}
+
+/* ============================================================
+   卡片 / 纸面 / 分隔
+   ============================================================ */
+.card-surface {
+  /* 炭黑卡片：纯色表面 + 一道金灰细线；层级交给阴影，不用渐变 */
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-1);
+  transition:
+    border-color var(--t-base) var(--ease),
+    box-shadow var(--t-base) var(--ease),
+    background var(--t-base) var(--ease),
+    transform var(--t-base) var(--ease);
+}
+.card-surface:hover {
+  border-color: var(--line-strong);
+}
+.card-surface:focus-within {
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent);
+}
+
+.paper {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-2);
+}
+
+.card-lift {
+  transition:
+    border-color var(--t-base) var(--ease),
+    background var(--t-base) var(--ease);
+}
+.card-lift:hover {
+  border-color: var(--line-strong);
+}
+
+.hairline {
+  background: var(--line);
+  height: 1px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--line-soft);
+  border: 0;
+}
+
+.pill {
+  border-radius: var(--r-pill);
+}
+
+/* 应用根容器：全局字号与键盘焦点 */
+.writer-shell {
+  font-size: 14px;
+}
+.writer-shell :focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 3px;
+}
+
+/* 模式 / 页签切换的内容入场：随条件渲染挂载时播一次，轻微上移 + 淡入。
+   只动 3px / 180ms —— 动效要让人「感觉到变化」，不能让人「等它动完」。 */
+.mode-fade {
+  animation: mode-fade var(--t-base) var(--ease) backwards;
+}
+@keyframes mode-fade {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Codex 风格对话布局：内容克制、输入区悬浮、工具条低对比度 */
+.session-rail {
+  background: color-mix(in srgb, var(--rail) 94%, var(--bg) 6%);
+}
+/* 消息入场动画统一在下方 .msg-assistant / .msg-user 定义；
+   这里曾有一份 180ms 的同名规则，被后者整段覆盖，属于死代码，已删除。 */
+.msg-user > div > div:last-child {
+  max-width: min(680px, 86vw);
+}
+
+/* ============================================================
+   自绘标题栏
+   ============================================================ */
+.app-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+}
+.app-no-drag,
+.app-drag button,
+.app-drag input,
+.app-drag a,
+.app-drag select,
+.app-drag textarea {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+/* ============================================================
+   动效
+   ============================================================ */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    /* 终帧必须归零成 none：.reveal 用 fill-mode both 长期保留终帧，
+       留着 translateY(0) 会让弹窗面板变成 position:fixed 下拉层的包含块，
+       下拉被错误定位并裁进弹窗里，撑出大片滚动区 */
+    transform: none;
+  }
+}
+
+@keyframes ink-breathe {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes rail-in {
+  from {
+    opacity: 0;
+    transform: translateX(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes msg-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes msg-rise-right {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-in {
+  animation: toast-in 0.3s var(--ease-jelly) backwards;
+}
+
+/* 退场：淡出 + 轻微上移收缩。元素在动画结束时即被移除，forwards 不会长期保留 transform */
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+}
+.toast-out {
+  animation: toast-out 0.2s var(--ease) forwards;
+  pointer-events: none;
+}
+
+/* 下拉 / 气泡菜单：从触发钮方向弹性放大进场（两个绝对定位菜单共用） */
+.menu-pop {
+  transform-origin: bottom left;
+  animation: menu-pop 0.24s var(--ease-jelly) backwards;
+}
+@keyframes menu-pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 消息 / 会话入场一律 backwards：both 会把终帧 transform 永久留在元素上，
+   使其成为 fixed 后代的包含块（Chromium 126 实证，连终帧写 none 也一样），
+   消息里的下拉、浮层会被顶偏。backwards 只填延迟期，结束回到无 transform 的基础样式。 */
+.session-item {
+  animation: rail-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.msg-assistant {
+  animation: msg-rise 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+.msg-user {
+  animation: msg-rise-right 0.26s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+.thread-swap {
+  animation: rail-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+
+/* 入场 400ms 偏慢：大面积面板（稿纸、弹层、列表）会有"等它出现"的拖沓感，统一收到 300ms；
+   缓动换成回弹曲线——落定时轻微过冲 1~2px，是入场唯一的「果冻味」来源 */
+.reveal {
+  /* 不要用 both：动画结束后填终帧会长期保留 transform，让弹窗面板变成
+     position:fixed 下拉层的包含块，下拉被错位裁掉还把滚动区撑爆。
+     backwards 只在动画开始前应用首帧，结束后回到基础样式（无 transform）。 */
+  animation: fade-up 0.3s var(--ease-jelly) backwards;
+}
+.reveal-1 {
+  animation-delay: 0.04s;
+}
+.reveal-2 {
+  animation-delay: 0.08s;
+}
+.reveal-3 {
+  animation-delay: 0.12s;
+}
+.reveal-4 {
+  animation-delay: 0.16s;
+}
+
+/* ===== 转场与入场编排 =====
+   路由转场走 View Transitions：旧页先退（轻微缩小 + 虚化），新页再进（上移 + 归位），
+   两段错开 40ms 产生“接力”感，而不是整屏硬切。 */
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 退场 / 进场的位移与缩放曲线保持原样；去掉了 filter: blur——
+   对整块内容区截图做模糊是每帧整面重算，大窗口、高分屏上最容易掉帧 */
+@keyframes vt-out {
+  to {
+    opacity: 0;
+    transform: scale(0.994);
+  }
+}
+
+@keyframes vt-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0) scale(0.996);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 180% 0;
+  }
+  100% {
+    background-position: -80% 0;
+  }
+}
+
+/* 页面转场（full 档，见 lib/motion.ts）：
+   - 整窗不截图（root 不起名字），只有内容区 app-content 截新旧两张、做退场 / 进场；
+   - 转场层不接收点击，动画播放期间点侧栏、工具栏、新页面都直接生效；
+   - 关键帧只动 opacity / transform，交给合成器，不再用全屏模糊滤镜。 */
+:root {
+  view-transition-name: none;
+}
+::view-transition {
+  pointer-events: none;
+}
+
+::view-transition-old(app-content) {
+  animation: vt-out 180ms var(--ease) both;
+}
+
+::view-transition-new(app-content) {
+  animation: vt-in 340ms var(--ease) 40ms both;
+}
+
+/* lite 档的页面进场（低配机器或截图过慢时，见 lib/motion.ts）：不截图，只动 opacity / transform，
+   全程在合成层上跑、不挡点击 */
+.route-enter-a,
+.route-enter-b {
+  animation: page-enter 280ms var(--ease) backwards;
+}
+
+/* 列表错峰入场：子元素带 --stagger-index 即可依次浮现 */
+.stagger-item {
+  animation: rise-in 380ms var(--ease) backwards;
+  animation-delay: calc(var(--stagger-index, 0) * 45ms);
+}
+
+/* 骨架微光：加载态保持结构尺寸，只让高光扫过 */
+.skeleton {
+  background-color: var(--panel2);
+  background-image: linear-gradient(
+    100deg,
+    transparent 24%,
+    color-mix(in srgb, var(--panel) 88%, transparent) 45%,
+    transparent 66%
+  );
+  background-size: 240% 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: var(--r-sm);
+}
+
+/* 按下反馈：所有可点元素统一轻微收缩，避免各处手感不一致 */
+.btn:active:not(:disabled),
+.home-button:active:not(:disabled),
+.resources-button:active:not(:disabled),
+.shell-tab:active:not(:disabled),
+.writing-tool:active:not(:disabled),
+.writing-button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.breathing {
+  animation: ink-breathe 1.5s ease-in-out infinite;
+}
+
+/* 长列表渲染跳过：视口外的行不参与布局与绘制，滚回来自动恢复（千章列表不卡的关键）。
+   contain-intrinsic-size 给出未渲染时的估算高度，auto 前缀让浏览器记住真实高度。 */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 42px;
+}
+
+/* .progress-glow（2.2s 无限扫光）在 src 中已无任何引用，作为死代码删除：
+   一旦被启用就是大面积 background-position 重绘的无限动画。 */
+
+/* ============================================================
+   应用内对话框（替代原生 confirm / alert）
+   ============================================================ */
+.dlg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  /* 同弹层：不做整屏 backdrop 模糊，软件合成下会把确认框开合拖成幻灯片 */
+  background: rgba(4, 5, 6, 0.72);
+  animation: dlg-fade 0.18s var(--ease) both;
+}
+
+.dlg {
+  position: relative;
+  width: min(440px, 100%);
+  max-height: min(72vh, 620px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 24px 20px;
+  border-radius: var(--r-xl);
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--sh-4, var(--sh-3));
+  animation: dlg-pop 0.32s var(--ease-jelly) backwards;
+}
+
+.dlg__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dlg__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+}
+
+.dlg__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.4;
+  color: var(--text);
+  letter-spacing: 0.03em;
+}
+
+.dlg__body {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dlg__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+@keyframes dlg-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dlg-pop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dlg-overlay,
+  .dlg {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-item,
+  .msg-assistant,
+  .msg-user,
+  .thread-swap,
+  .toast-in,
+  .menu-pop,
+  .reveal,
+  .breathing,
+  .stagger-item,
+  .route-enter-a,
+  .route-enter-b {
+    animation: none;
+  }
+  .skeleton {
+    animation: none;
+  }
+  .btn,
+  .card-surface,
+  .card-lift,
+  .card-jelly {
+    transition: none !important;
+  }
+}
+
+/* 全局兜底：Tailwind 的 transition-* / duration-* 写在组件上，逐个降级容易漏。
+   系统开启「减少动态效果」时统一压成瞬时（hover 变色变成瞬变，属预期）。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mode-fade {
+    animation: none;
+  }
+}
+
+/* 系统开启“增强对比度”时，把弱分隔线提升为可辨识边框；不改变布局层级。 */
+@media (prefers-contrast: more) {
+  :root {
+    --line: var(--line-strong);
+    --line-soft: var(--line-strong);
+    --text-dim: var(--text);
+    --text-faint: var(--text);
+  }
+
+  .card-surface,
+  .paper,
+  .studio-search,
+  .composer,
+  .home-search,
+  .home-input {
+    border-color: var(--line-strong);
+  }
+}
+
+/* 系统要求减少透明时，工具栏改为实色（大面积模糊已移除，遮罩本身已是不透明压暗）。 */
+@media (prefers-reduced-transparency: reduce) {
+  .shell-toolbar {
+    background: var(--panel);
+  }
+}

@@ -1,0 +1,289 @@
+/* 人物卡：左侧宣纸「画像」（没有立绘，用名字首字 + 远山），右侧姓名、身份、性格标签与一句话小传。
+   最多两列；「查看 / 编辑」在卡内展开全部字段，展开时占满整行。 */
+.plan-chars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, max(290px, calc((100% - 18px) / 2))), 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+
+.plan-char {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  transition: border-color 160ms var(--ease);
+}
+.plan-char:hover {
+  border-color: var(--line-strong);
+}
+.plan-char.is-open {
+  grid-column: 1 / -1;
+  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+}
+.plan-char__summary {
+  display: grid;
+  flex: 1;
+  grid-template-columns: clamp(92px, 31%, 136px) minmax(0, 1fr);
+  gap: 16px;
+  padding: 14px;
+}
+
+/* 画像：宣纸底 + 首字 + 远山；深浅主题下都是一张纸 */
+.plan-char__portrait {
+  position: relative;
+  min-height: 160px;
+  overflow: hidden;
+  border: 1px solid rgba(110, 84, 44, 0.24);
+  border-radius: var(--r-md);
+  background-color: var(--paper);
+  background-image:
+    var(--ink-grain), radial-gradient(90% 70% at 50% 16%, rgba(255, 251, 240, 0.62), transparent 70%),
+    linear-gradient(180deg, transparent 38%, rgba(120, 92, 52, 0.16));
+  color: var(--paper-ink);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset;
+}
+.plan-char__hills {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 46%;
+  opacity: 0.9;
+}
+.plan-char__glyph,
+.plan-char__glyph-icon {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+.plan-char__glyph {
+  font-family: var(--font-display);
+  font-size: 50px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--paper-ink);
+  opacity: 0.86;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.plan-char__glyph-icon {
+  color: var(--paper-faint);
+}
+.plan-char__seal {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+}
+
+.plan-char__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 2px;
+}
+.plan-char__name,
+.plan-char__role {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-char__name {
+  margin: 0;
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.06em;
+}
+.plan-char__name.is-empty {
+  color: var(--text-faint);
+  font-weight: 600;
+}
+.plan-char__role {
+  margin: 5px 0 0;
+  color: var(--text-dim);
+  font-size: 13.5px;
+}
+.plan-char__traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.plan-char__traits .ink-pill {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 20px;
+}
+.plan-char__body .plan-char__rule {
+  margin: 12px 0 10px;
+  background: var(--line-soft);
+}
+.plan-char__bio {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.75;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.plan-char__bio.is-empty {
+  color: var(--text-faint);
+}
+.plan-char__foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 10px;
+}
+.plan-char__toggle {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 30px;
+  margin-left: -6px;
+  padding: 0 6px;
+  border-radius: var(--r-sm);
+  color: var(--gold);
+  font-size: 13px;
+}
+.plan-char__toggle:hover {
+  background: var(--gold-soft);
+}
+.plan-char__chev {
+  margin-left: auto;
+  transition: transform 160ms var(--ease);
+}
+.plan-char.is-open .plan-char__chev {
+  transform: rotate(90deg);
+}
+.plan-char__editor {
+  padding: 16px 18px 18px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* 添加配角：虚线占位卡 */
+.plan-char-add {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 132px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--panel) 50%, transparent);
+  color: var(--text-dim);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.plan-char-add:hover {
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+.plan-char-add__icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+}
+
+/* 画像即上传入口：悬停 / 聚焦 / 拖入时罩一层墨色，提示上传或更换照片 */
+button.plan-char__portrait {
+  display: block;
+  width: 100%;
+  padding: 0;
+  cursor: pointer;
+  text-align: center;
+}
+button.plan-char__portrait:disabled {
+  cursor: progress;
+}
+.plan-char__portrait:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+.plan-char__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 22%;
+}
+.plan-char__portrait.has-photo {
+  border-color: color-mix(in srgb, var(--gold) 40%, transparent);
+}
+.plan-char__upload {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(12, 13, 15, 0.58);
+  color: var(--gold-hi);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+.plan-char__portrait:hover .plan-char__upload,
+.plan-char__portrait:focus-visible .plan-char__upload,
+.plan-char__portrait.is-dragging .plan-char__upload,
+.plan-char__portrait:disabled .plan-char__upload {
+  opacity: 1;
+}
+.plan-char__portrait.is-dragging {
+  outline: 2px dashed var(--gold);
+  outline-offset: 2px;
+}
+.plan-char__photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+}
+.plan-char__photo-label {
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.plan-char__photo-hint {
+  min-width: 0;
+  flex: 1;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+
+@media (max-width: 480px) {
+  .plan-char__summary {
+    gap: 12px;
+    padding: 12px;
+  }
+  .plan-char__portrait {
+    min-height: 140px;
+  }
+  .plan-char__glyph {
+    font-size: 40px;
+  }
+}

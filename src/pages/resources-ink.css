@@ -1,0 +1,223 @@
+/* 墨金：素材 / 资料库 / 设置。在 resources.css 之上做表面、排版与选中态。 */
+.resources-scope {
+  font-family: var(--font-ui);
+}
+.resources-scope .resources-page-header h1,
+.resources-scope .resources-section-header h2,
+.resources-scope .resources-docs-heading h3 {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+.resources-scope .resources-page-header h1 {
+  font-size: 30px;
+  font-weight: 700;
+}
+.resources-scope .resources-page-header p {
+  color: var(--text-dim);
+  font-size: 13.5px;
+}
+.resources-scope .resources-button {
+  min-height: 36px;
+  border-radius: var(--r-md);
+  border-color: var(--line);
+  font-size: 13px;
+}
+.resources-scope .resources-button--primary {
+  border-color: var(--gilt-line);
+  background: linear-gradient(180deg, var(--gilt-top), var(--gilt-bottom));
+  color: var(--gilt-text);
+  font-weight: 600;
+}
+.resources-scope .resources-button--primary:hover:not(:disabled) {
+  border-color: var(--gold);
+  background: linear-gradient(180deg, var(--gilt-top), var(--gilt-bottom));
+  color: var(--gilt-text);
+  box-shadow: inset 0 0 14px var(--gilt-glow);
+}
+.resources-scope .resources-button--quiet {
+  color: var(--text-dim);
+}
+/* 危险：朱砂墨块（与 .btn--danger 同一套）。必须写在 quiet 之后——
+   「删除库」是 quiet + danger 组合，原先 quiet 的灰字后加载，把朱砂色盖掉了 */
+.resources-scope .resources-button--danger {
+  border-color: color-mix(in srgb, var(--seal) 38%, transparent);
+  background: color-mix(in srgb, var(--seal-fill) 14%, var(--panel));
+  color: var(--seal);
+}
+.resources-scope .resources-button--danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--seal) 62%, transparent);
+  background: color-mix(in srgb, var(--seal-fill) 24%, var(--panel));
+  color: var(--seal);
+}
+/* 列表行里的「移除」：一排朱砂框太吵，平时只留朱砂字，悬停才出墨块 */
+.resources-scope .resources-document-row .resources-button--danger:not(:hover):not(:focus-visible) {
+  border-color: transparent;
+  background: transparent;
+}
+.resources-scope .resources-button--accent {
+  color: var(--gilt-text);
+}
+.resources-scope .resources-segmented {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel2);
+}
+.resources-scope .resources-segmented button {
+  border-radius: var(--r-sm);
+  font-size: 13px;
+}
+.resources-scope .resources-segmented button[aria-pressed='true'] {
+  background: linear-gradient(180deg, var(--gilt-top), var(--gilt-bottom));
+  color: var(--gilt-text);
+  font-weight: 600;
+  box-shadow: inset 0 0 0 1px var(--gilt-line);
+}
+.resources-scope input:not([type='checkbox']):not([type='range']),
+.resources-scope textarea,
+.resources-scope select {
+  border-radius: var(--r-md);
+  background: var(--panel2);
+  border-color: var(--line);
+}
+.resources-scope .resources-reading-card,
+.resources-scope .resources-surface,
+.resources-scope .resources-station {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+}
+.resources-scope .resources-reading-card:hover {
+  border-color: var(--line-strong);
+}
+.resources-scope .resources-reading-card h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+.resources-scope .resources-card-meta {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.resources-scope .resources-tags > span {
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--panel2);
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+.resources-scope .resources-empty {
+  border: 1px dashed var(--line-strong);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+}
+.resources-scope .resources-empty h2 {
+  font-family: var(--font-display);
+  font-size: 21px;
+  letter-spacing: 0.08em;
+}
+.resources-scope .resources-kb-item.is-selected {
+  border: 1px solid color-mix(in srgb, var(--gold) 34%, transparent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--gold) 15%, transparent), var(--gold-soft));
+  color: var(--text);
+}
+.resources-scope .resources-document-row {
+  border-top-color: var(--line-soft);
+}
+.resources-scope .resources-document-row:hover {
+  background: var(--hover);
+}
+.resources-scope .resources-question {
+  border: 1px solid color-mix(in srgb, var(--gold) 22%, var(--line));
+  background: var(--panel2);
+}
+.resources-scope .resources-answer {
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.resources-scope .resources-search-hit {
+  border: 1px solid var(--line-soft);
+  background: var(--panel2);
+}
+.resources-scope mark {
+  background: var(--gold-soft);
+  color: var(--gold);
+  padding: 0 2px;
+  border-radius: 3px;
+}
+
+/* 素材：随手记一条灵感 */
+.shelf-quick {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--sh-1);
+}
+.shelf-quick-field {
+  flex: 1;
+  min-width: 0;
+}
+.shelf-quick input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.shelf-quick input::placeholder {
+  color: var(--text-faint);
+}
+.shelf-quick input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--gold) 65%, transparent);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+
+/* 设置：模型站点与状态 */
+.resources-scope .resources-station-header {
+  padding: 14px 16px;
+}
+.resources-scope .resources-station-toggle strong {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+.resources-scope .resources-model-columns {
+  border-top-color: var(--line-soft);
+  background: var(--panel2);
+  color: var(--text-faint);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.resources-scope .resources-model-row {
+  padding: 14px 18px;
+}
+.resources-scope .resources-model-info strong {
+  font-size: 14px;
+}
+.resources-scope .resources-setting-row {
+  padding: 18px 20px;
+}
+.resources-scope .resources-setting-row h3 {
+  font-family: var(--font-display);
+  font-size: 16px;
+  letter-spacing: 0.03em;
+}
+.resources-scope .resources-section-nav {
+  border-bottom-color: var(--line);
+}
+.resources-scope .resources-section-nav a {
+  font-size: 13.5px;
+}
+.resources-scope .resources-section-nav a:hover {
+  color: var(--gold);
+}

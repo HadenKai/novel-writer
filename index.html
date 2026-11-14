@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>小说工坊 · 长篇创作台</title>
+    <!--
+      内容安全策略（打包后的生产环境生效）。
+      原则：默认只信任自身与本地后端，禁用一切远程脚本/对象/框架嵌套。
+      说明：
+       - style-src 需要 'unsafe-inline'：React 组件会写内联 style，Tailwind 也在运行时注入。
+       - script-src 只需 'self'：首帧主题脚本已抽到 /theme-init.js（见该文件）。
+       - img-src 允许 data:/blob:：导出预览与图标可能用 data URI。
+       - connect-src 覆盖本机后端：生产页由 Electron 从后端同源端口加载（'self' 即够），
+         额外列出 127.0.0.1/localhost 通配端口是兼容独立运行（端口可能向上浮动若干位）。
+       - media-src 一并放开 data:/blob:，便于将来做 TTS 朗读而不必再改策略。
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' http://127.0.0.1:* http://localhost:*; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'"
+    />
+    <script src="/theme-init.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

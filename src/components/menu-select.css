@@ -1,0 +1,152 @@
+/* 自绘下拉菜单：炭黑浮层 + 金线细框，选中项鎏金字与金点。 */
+
+.menu-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.menu-select-trigger:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.menu-select-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-select-chevron {
+  flex: 0 0 auto;
+  margin-left: auto;
+  opacity: 0.5;
+  transition: transform 140ms ease;
+}
+
+.menu-select-trigger[aria-expanded='true'] .menu-select-chevron {
+  transform: rotate(180deg);
+  opacity: 0.8;
+}
+
+.menu-select-panel {
+  position: fixed;
+  z-index: 80;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  background: var(--panel);
+  box-shadow: var(--sh-4);
+  animation: menu-select-in 140ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes menu-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.menu-select-group {
+  margin: 10px 10px 4px;
+  color: var(--gold);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  opacity: 0.85;
+}
+
+.menu-select-group:first-child {
+  margin-top: 4px;
+}
+
+.menu-select-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    background 110ms ease,
+    color 110ms ease;
+}
+
+.menu-select-option.is-active {
+  background: var(--active);
+  color: var(--text);
+}
+
+.menu-select-option.is-selected {
+  color: var(--gold);
+  font-weight: 600;
+}
+
+.menu-select-option.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 占位项（「请选择模型」这类）：弱化显示，不画选中点 */
+.menu-select-option.is-muted {
+  color: var(--text-faint);
+}
+
+.menu-select-option.is-muted.is-active {
+  color: var(--text-dim);
+}
+
+.menu-select-dot {
+  flex: 0 0 5px;
+  width: 5px;
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: transparent;
+  transition: background 110ms ease;
+}
+
+.menu-select-option.is-selected .menu-select-dot {
+  background: var(--gold);
+}
+
+.menu-select-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu-select-hint {
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.menu-select-empty {
+  margin: 0;
+  padding: 10px 9px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-select-panel {
+    animation: none;
+  }
+  .menu-select-option,
+  .menu-select-dot,
+  .menu-select-chevron {
+    transition: none;
+  }
+}

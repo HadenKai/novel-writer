@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="小说工坊">
+  <rect width="64" height="64" rx="10" fill="#B8412F" />
+  <rect x="7.5" y="7.5" width="49" height="49" rx="4" fill="none" stroke="#F6E6D8" stroke-width="2.2" />
+  <text
+    x="32"
+    y="43.5"
+    text-anchor="middle"
+    font-family="Noto Serif SC, Source Han Serif SC, Songti SC, SimSun, serif"
+    font-size="31"
+    font-weight="700"
+    fill="#F6E6D8"
+  >稿</text>
+</svg>

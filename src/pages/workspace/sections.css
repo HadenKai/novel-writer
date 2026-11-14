@@ -1,0 +1,489 @@
+/* 设定 / 规划各分区：区块卡、世界观折叠行、文风 / 模板 / 技能选择块、总纲宣纸卡。 */
+
+/* ---------- 区块卡：基本信息 / 文风 / 参考作品 ---------- */
+.plan-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.plan-sec {
+  padding: 20px 22px 22px;
+}
+.plan-sec__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+.plan-sec__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+}
+.plan-sec__hint {
+  margin: 8px 0 16px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+.plan-sec__note {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.85;
+}
+.plan-sec__note b {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.plan-sec__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  margin-top: 10px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* ---------- 世界观：图标 + 名称 + 一行预览，展开编辑 ---------- */
+.plan-world {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.plan-world__row {
+  overflow: hidden;
+}
+.plan-world__row.is-open {
+  border-color: color-mix(in srgb, var(--gold) 36%, transparent);
+}
+.plan-world__toggle {
+  display: grid;
+  grid-template-columns: 24px 112px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 60px;
+  padding: 0 18px;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.plan-world__toggle:hover {
+  background: var(--hover);
+}
+.plan-world__icon {
+  color: var(--gold);
+}
+.plan-world__label {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+.plan-world__preview {
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-world__preview.is-empty {
+  color: var(--text-faint);
+}
+.plan-world__chev {
+  color: var(--text-faint);
+  transition: transform 180ms var(--ease);
+}
+.plan-world__row.is-open .plan-world__chev {
+  color: var(--gold);
+  transform: rotate(180deg);
+}
+.plan-world__body {
+  padding: 2px 18px 18px 56px;
+}
+.plan-world__hint {
+  margin: 0 0 8px;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* ---------- 文风 / 模板 / 技能选择块：选中为鎏金框 + 淡金底（技能启用用竹青） ---------- */
+.plan-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr));
+  gap: 10px;
+}
+.plan-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  background: var(--panel2);
+  transition:
+    border-color 140ms ease,
+    background 140ms ease;
+}
+.plan-tile:hover {
+  border-color: var(--line-strong);
+}
+.plan-tile.is-selected {
+  border-color: color-mix(in srgb, var(--gold) 62%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--gold) 14%, var(--panel2)), var(--panel2) 72%);
+}
+.plan-tile--jade.is-selected {
+  border-color: color-mix(in srgb, var(--jade) 58%, transparent);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--jade) 13%, var(--panel2)), var(--panel2) 72%);
+}
+.plan-tile__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 11px 34px 11px 14px;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.plan-tile__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.plan-tile.is-selected .plan-tile__name {
+  color: var(--gold);
+}
+.plan-tile--jade.is-selected .plan-tile__name {
+  color: var(--jade);
+}
+.plan-tile__badge {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 400;
+}
+.plan-tile__desc {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.65;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.plan-tile__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 3px;
+}
+.plan-tile__tags .ink-pill {
+  min-height: 20px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+.plan-tile__check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+  color: var(--gold-contrast);
+  pointer-events: none;
+}
+.plan-tile--jade .plan-tile__check {
+  background: var(--jade);
+  color: var(--panel);
+}
+.plan-tile__ops {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  margin-top: -6px;
+  padding: 0 8px 7px;
+}
+.plan-tile__op {
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: var(--r-xs);
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.plan-tile__op:hover {
+  background: var(--hover);
+  color: var(--gold);
+}
+.plan-tile__op--danger:hover {
+  color: var(--seal);
+}
+
+/* ---------- 总纲：一张宣纸，右下角淡淡的远山楼阁 ---------- */
+.plan-master {
+  position: relative;
+  overflow: hidden;
+  padding: 26px 34px 20px;
+}
+:root:not(.dark) .plan-master {
+  border-color: rgba(110, 84, 44, 0.3);
+}
+.plan-master__art {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: min(560px, 58%);
+  height: 190px;
+  color: var(--paper-ink);
+  opacity: 0.5;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 45%);
+  mask-image: linear-gradient(90deg, transparent, #000 45%);
+}
+.plan-master > :not(.plan-master__art) {
+  position: relative;
+}
+.plan-master__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 18px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--paper-line);
+}
+.plan-master__title {
+  margin: 0;
+  color: var(--paper-ink);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.plan-master__desc {
+  margin: 0;
+  color: var(--paper-dim);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.planning-page .plan-master__text {
+  display: block;
+  width: 100%;
+  min-height: 420px;
+  margin-top: 14px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: var(--r-xs);
+  background: transparent;
+  color: var(--paper-ink);
+  font-family: var(--font-reading);
+  font-size: 15.5px;
+  line-height: 2;
+  letter-spacing: 0.02em;
+  resize: vertical;
+  field-sizing: content;
+}
+.planning-page .plan-master__text::placeholder {
+  color: var(--paper-faint);
+}
+.planning-page .plan-master__text:focus,
+.planning-page .plan-master__text:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+.plan-master:focus-within {
+  border-color: rgba(133, 98, 44, 0.55);
+  box-shadow:
+    var(--sh-paper),
+    0 0 0 2px color-mix(in srgb, var(--gold) 34%, transparent);
+}
+.plan-master__foot {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--paper-line);
+  color: var(--paper-faint);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .plan-sec {
+    padding: 16px;
+  }
+  .plan-world__toggle {
+    grid-template-columns: 22px minmax(0, 1fr) 18px;
+    min-height: 54px;
+    padding: 0 14px;
+  }
+  .plan-world__preview {
+    display: none;
+  }
+  .plan-world__body {
+    padding: 2px 14px 16px;
+  }
+  .plan-master {
+    padding: 20px 18px 16px;
+  }
+  .plan-master__art {
+    width: 80%;
+    height: 130px;
+  }
+}
+
+/* ---------- 文风推荐 banner ---------- */
+.plan-tile__badge--rec {
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--gold) 16%, transparent);
+  color: var(--gold-text);
+  font-weight: 600;
+}
+.style-rec {
+  margin: 4px 0 14px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, transparent);
+  border-radius: var(--r-md);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--gold) 9%, var(--panel2)), var(--panel2) 70%);
+}
+.style-rec__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 9px;
+  color: var(--gold-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.style-rec__picks {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 8px;
+}
+.style-rec__pick {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 140ms ease,
+    background 140ms ease,
+    transform 140ms ease;
+}
+.style-rec__pick:hover {
+  border-color: var(--line-strong);
+  transform: translateY(-1px);
+}
+.style-rec__pick.is-on {
+  border-color: color-mix(in srgb, var(--gold) 60%, transparent);
+  background: color-mix(in srgb, var(--gold) 12%, var(--panel));
+}
+.style-rec__rank {
+  grid-row: 1 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  color: var(--gold-text);
+  font-size: 11px;
+  font-weight: 700;
+}
+.style-rec__name {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.style-rec__reason {
+  grid-column: 2;
+  color: var(--text-faint);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.style-rec__auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px dashed color-mix(in srgb, var(--gold) 45%, transparent);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--gold-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease;
+}
+.style-rec__auto:hover {
+  background: color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.style-rec__auto.is-on {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--gold) 65%, transparent);
+  background: color-mix(in srgb, var(--gold) 15%, transparent);
+  font-weight: 600;
+}
+
+/* 文风卡片错峰入场：轻量、不保留 transform（避免 fixed 包含块陷阱） */
+.plan-tiles .plan-tile {
+  animation: tile-in 320ms var(--ease, ease-out) backwards;
+}
+.plan-tiles .plan-tile:nth-child(2) {
+  animation-delay: 30ms;
+}
+.plan-tiles .plan-tile:nth-child(3) {
+  animation-delay: 60ms;
+}
+.plan-tiles .plan-tile:nth-child(4) {
+  animation-delay: 90ms;
+}
+.plan-tiles .plan-tile:nth-child(5) {
+  animation-delay: 120ms;
+}
+.plan-tiles .plan-tile:nth-child(6) {
+  animation-delay: 150ms;
+}
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-tiles .plan-tile,
+  .style-rec {
+    animation: none;
+  }
+  .style-rec__pick:hover {
+    transform: none;
+  }
+}

@@ -1,0 +1,708 @@
+/* 墨金组件原语：所有页面共用的表面、标题、细线、胶囊、输入、页签与印章。
+   页面样式应优先组合这些类，不要各写一套。令牌定义见 index.css，规范见 docs/ink-design.md。 */
+
+:root {
+  /* 宣纸颗粒：极淡的噪点叠在纸面上，近看有纤维感，远看是一张平整的纸 */
+  --ink-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.35 0 0 0 0 0.27 0 0 0 0 0.16 0 0 0 0.09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- 表面 ---------- */
+
+/* 炭黑卡片：页面里的大多数容器 */
+.ink-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-1);
+}
+
+/* 可点卡片：悬停时金线变亮、轻抬 */
+.ink-card--hover {
+  transition:
+    border-color 160ms var(--ease),
+    transform 220ms var(--ease),
+    box-shadow 220ms var(--ease);
+}
+@media (hover: hover) and (pointer: fine) {
+  .ink-card--hover:hover {
+    border-color: var(--line-strong);
+    transform: translateY(-2px);
+    box-shadow: var(--sh-2);
+  }
+}
+
+/* 内嵌面：卡片里的分组底色 */
+.ink-well {
+  background: var(--panel2);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+}
+
+/* 宣纸稿面：正文、候选稿、AI 回复气泡、总纲卡。配合 .ink-on-paper 使用 */
+.ink-paper {
+  background-color: var(--paper);
+  background-image:
+    var(--ink-grain), radial-gradient(120% 90% at 50% 0%, rgba(255, 252, 244, 0.55), transparent 60%),
+    radial-gradient(90% 70% at 100% 100%, rgba(120, 92, 52, 0.08), transparent 70%);
+  color: var(--paper-ink);
+  border: 1px solid rgba(110, 84, 44, 0.22);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-paper);
+}
+
+/* ---------- 标题 ---------- */
+
+.ink-display {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.25;
+  color: var(--text);
+}
+
+/* 区块标题：◇ 鎏金菱形 + 宋体 */
+.ink-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+.ink-section-title::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border: 1.4px solid var(--gold);
+  transform: rotate(45deg);
+  box-shadow: inset 0 0 0 1.5px var(--panel);
+  background: var(--gold);
+}
+
+/* 竖条标题：┃ 鎏金短竖线 + 宋体（作品库「我的作品」、审校「原稿」） */
+.ink-bar-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  color: var(--text);
+}
+.ink-bar-title::before {
+  content: '';
+  width: 3px;
+  height: 1.05em;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold-lo));
+}
+
+.ink-kicker {
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+}
+
+/* ---------- 细线 ---------- */
+
+.ink-rule {
+  height: 1px;
+  border: 0;
+  background: var(--line);
+}
+.ink-rule--gold {
+  height: 1px;
+  border: 0;
+  background: linear-gradient(90deg, transparent, var(--line-gold) 18%, var(--line-gold) 82%, transparent);
+}
+
+/* ---------- 胶囊、标签、状态 ---------- */
+
+.ink-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 22px;
+  padding: 1px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--panel2);
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.ink-pill--jade {
+  border-color: color-mix(in srgb, var(--jade) 38%, transparent);
+  background: color-mix(in srgb, var(--jade) 14%, transparent);
+  color: var(--jade);
+}
+.ink-pill--seal {
+  border-color: color-mix(in srgb, var(--seal) 38%, transparent);
+  background: color-mix(in srgb, var(--seal-fill) 15%, transparent);
+  color: var(--seal);
+}
+.ink-pill--gold {
+  border-color: color-mix(in srgb, var(--gold) 42%, transparent);
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+.ink-pill--slate {
+  border-color: rgba(128, 150, 170, 0.34);
+  background: rgba(110, 132, 152, 0.14);
+  color: #9fb3c4;
+}
+:root:not(.dark) .ink-pill--slate {
+  color: #47606f;
+}
+
+/* 可点的筛选胶囊（素材库分类、资料库标签） */
+/* 胶囊：圆头 + 淡金细线；选中是烫金墨块（与主按钮同一套 --gilt-* 令牌） */
+.ink-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 1px solid color-mix(in srgb, var(--gold) 26%, var(--line));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.ink-chip:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--gold) 55%, transparent);
+  background: var(--gold-soft);
+  color: var(--gilt-text);
+}
+.ink-chip[aria-pressed='true'],
+.ink-chip.is-active {
+  background: linear-gradient(180deg, var(--gilt-top), var(--gilt-bottom));
+  border-color: var(--gilt-line);
+  color: var(--gilt-text);
+  font-weight: 600;
+  box-shadow: inset 0 0 10px var(--gilt-glow);
+}
+
+/* 状态胶囊：● 已保存 / ● 写作中 / ● 未发布 */
+.ink-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 2px 11px 2px 9px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.ink-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ink-status--jade {
+  color: var(--jade);
+  border-color: color-mix(in srgb, var(--jade) 32%, transparent);
+  background: color-mix(in srgb, var(--jade) 11%, transparent);
+}
+.ink-status--gold {
+  color: var(--gold);
+  border-color: color-mix(in srgb, var(--gold) 36%, transparent);
+  background: var(--gold-soft);
+}
+.ink-status--seal {
+  color: var(--seal);
+  border-color: color-mix(in srgb, var(--seal) 34%, transparent);
+  background: color-mix(in srgb, var(--seal-fill) 12%, transparent);
+}
+
+/* 状态圆点（章节列表的已定稿 / 编辑中 / 未开始） */
+.ink-dot {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.ink-dot--jade {
+  background: var(--jade);
+}
+.ink-dot--gold {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.ink-dot--seal {
+  background: var(--seal);
+}
+
+/* ---------- 输入 ---------- */
+
+.ink-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel2);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.6;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    background 140ms ease;
+}
+.ink-input::placeholder {
+  color: var(--text-faint);
+}
+.ink-input:hover:not(:disabled) {
+  border-color: var(--line-strong);
+}
+.ink-input:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--gold) 70%, transparent) !important;
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+
+/* 带图标的搜索框：<label class="ink-search"><svg/><input/></label> */
+.ink-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--panel2);
+  color: var(--text-faint);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+.ink-search:focus-within {
+  border-color: color-mix(in srgb, var(--gold) 70%, transparent);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+.ink-search input {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.ink-search input:focus {
+  outline: none;
+  box-shadow: none;
+}
+.ink-search input::placeholder {
+  color: var(--text-faint);
+}
+
+/* 复选框：鎏金实底勾选 */
+.ink-check {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--panel2);
+  cursor: pointer;
+}
+.ink-check::after {
+  content: '';
+  width: 8px;
+  height: 4.5px;
+  margin-top: -2px;
+  border: solid var(--gold-contrast);
+  border-width: 0 0 1.8px 1.8px;
+  transform: rotate(-45deg) scale(0);
+  transition: transform 120ms var(--ease);
+}
+.ink-check:checked {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--gold-hi), var(--gold));
+}
+.ink-check:checked::after {
+  transform: rotate(-45deg) scale(1);
+}
+.ink-check:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* ---------- 页签 ---------- */
+
+/* 下划线页签：选中项鎏金字 + 发光短线 */
+.ink-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--line-soft);
+}
+.ink-tabs::-webkit-scrollbar {
+  display: none;
+}
+.ink-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+.ink-tab:hover {
+  color: var(--text);
+}
+.ink-tab::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi), var(--gold-lo));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--gold) 55%, transparent);
+  opacity: 0;
+  transform: scaleX(0.4);
+  transition:
+    opacity 160ms ease,
+    transform 220ms var(--ease);
+}
+.ink-tab[aria-pressed='true'],
+.ink-tab[aria-selected='true'],
+.ink-tab[aria-current='page'],
+.ink-tab.is-active {
+  color: var(--gold);
+  font-weight: 600;
+}
+.ink-tab[aria-pressed='true']::after,
+.ink-tab[aria-selected='true']::after,
+.ink-tab[aria-current='page']::after,
+.ink-tab.is-active::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+/* 竖排子导航：设定工作台左栏、资料库列表 */
+.ink-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ink-subnav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 140ms ease,
+    color 140ms ease,
+    border-color 140ms ease;
+}
+.ink-subnav-item:hover {
+  background: var(--hover);
+  color: var(--text);
+}
+.ink-subnav-item[aria-pressed='true'],
+.ink-subnav-item[aria-current='true'],
+.ink-subnav-item[aria-current='page'],
+.ink-subnav-item.is-active {
+  border-color: color-mix(in srgb, var(--gold) 34%, transparent);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--gold) 20%, transparent),
+    var(--gold-soft) 70%,
+    transparent
+  );
+  color: var(--text);
+  font-weight: 600;
+}
+.ink-subnav-item[aria-pressed='true'] svg,
+.ink-subnav-item[aria-current='true'] svg,
+.ink-subnav-item[aria-current='page'] svg,
+.ink-subnav-item.is-active svg {
+  color: var(--gold);
+}
+
+/* ---------- 数字、印章、进度 ---------- */
+
+.ink-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* 朱砂印：方形阴刻小印，用于品牌、章首、稿纸页眉 */
+.ink-seal {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--seal-fill);
+  color: #f6e6d8;
+  box-shadow:
+    inset 0 0 0 1.5px rgba(246, 230, 216, 0.85),
+    inset 0 0 0 3px var(--seal-fill);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+  user-select: none;
+}
+
+/* 细进度线：鎏金渐变 */
+.ink-progress {
+  position: relative;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--text) 9%, transparent);
+}
+.ink-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi));
+  box-shadow: 0 0 8px color-mix(in srgb, var(--gold) 45%, transparent);
+}
+
+/* 键位提示 */
+.ink-kbd {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--panel2);
+  color: var(--text-faint);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* 鎏金圆徽：书名首字、AI 头像 */
+.ink-emblem {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--gold) 22%, var(--panel2)), var(--panel) 72%);
+  border: 1px solid color-mix(in srgb, var(--gold) 72%, transparent);
+  box-shadow:
+    inset 0 0 0 3px var(--panel),
+    inset 0 0 0 4px color-mix(in srgb, var(--gold) 42%, transparent),
+    0 0 18px -6px color-mix(in srgb, var(--gold) 60%, transparent);
+  color: var(--gold);
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1;
+  user-select: none;
+}
+
+/* 生成式书封（components/InkArt CoverArt）：竖排书名 + 山月；尺寸由外层容器决定 */
+.ink-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  container-type: inline-size;
+  border-radius: 3px 6px 6px 3px;
+  box-shadow:
+    inset 3px 0 0 rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(198, 161, 91, 0.24),
+    0 10px 24px -10px rgba(0, 0, 0, 0.7);
+}
+.ink-cover__art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.ink-cover__title {
+  position: absolute;
+  top: 13%;
+  right: 15%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.06em;
+  font-family: var(--font-display);
+  font-size: 17cqw;
+  font-weight: 800;
+  line-height: 1;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+.ink-cover__title--long {
+  font-size: 13.5cqw;
+}
+.ink-cover--light .ink-cover__title {
+  text-shadow: none;
+}
+.ink-cover__genre {
+  position: absolute;
+  left: 12%;
+  bottom: 22%;
+  writing-mode: vertical-rl;
+  font-size: 7cqw;
+  letter-spacing: 0.3em;
+  opacity: 0.72;
+}
+.ink-cover__seal {
+  position: absolute;
+  left: 13%;
+  bottom: 9%;
+  width: 9cqw;
+  height: 11cqw;
+  border-radius: 1px;
+  background: #b8412f;
+  box-shadow: inset 0 0 0 1px rgba(255, 230, 210, 0.55);
+}
+@container (max-width: 70px) {
+  .ink-cover__genre {
+    display: none;
+  }
+}
+
+/* ---------- 空态 ---------- */
+
+.ink-empty {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 240px;
+  padding: 40px 24px;
+  overflow: hidden;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--panel) 70%, transparent);
+  text-align: center;
+}
+.ink-empty h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+.ink-empty p {
+  max-width: 440px;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+/* ---------- 页面根：作品工作区与研讨页共用的排版与焦点 ---------- */
+
+.collab-page,
+.collab-composer,
+.planning-page,
+.planning-board,
+.review-page,
+.preview-page {
+  font-family: var(--font-ui);
+  color: var(--text);
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+/* 按钮与链接用 outline；输入框用贴边的圆角光晕（outline 是矩形硬边，遇到圆角容器会对不齐） */
+:is(.collab-page, .collab-composer, .planning-page, .planning-board, .review-page, .preview-page)
+  :is(button, a):focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+:is(.collab-page, .collab-composer, .planning-page, .planning-board, .review-page, .preview-page)
+  :is(input, textarea):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--gold) 42%, transparent);
+}
+:is(.collab-page, .collab-composer, .planning-page, .review-page, .preview-page)
+  :is(button, input, select, textarea):disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+:is(.collab-page, .planning-page, .review-page, .preview-page) :is(input, textarea, select) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* 宣纸主题下白月会融进纸色：改成一枚淡赭色的月 */
+:root:not(.dark) .ink-moon__disc {
+  fill: #d8b77c;
+  opacity: 0.75;
+}
+
+/* 装饰性水墨画：只做氛围，永远不挡交互 */
+.ink-art {
+  pointer-events: none;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-card--hover,
+  .ink-tab::after,
+  .ink-check::after {
+    transition: none;
+  }
+}

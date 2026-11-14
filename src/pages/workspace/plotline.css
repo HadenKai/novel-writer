@@ -1,0 +1,292 @@
+/* 剧情线泳道：一条线一行。左侧色条（主线鎏金、感情线竹青、悬念线朱砂）+ 线名与目标，
+   右侧按章号排开的宣纸节点卡，鎏金细线相连，末尾虚线接「＋」。点泳道或节点在行内展开完整编辑。 */
+.plan-lanes {
+  padding: 4px 0;
+}
+.plan-lane {
+  --lane-tone: var(--line-strong);
+  --lane-text: var(--text-dim);
+}
+.plan-lane--gold {
+  --lane-tone: linear-gradient(180deg, var(--gold-hi), var(--gold-lo));
+  --lane-text: var(--gold);
+}
+.plan-lane--jade {
+  --lane-tone: var(--jade);
+  --lane-text: var(--jade);
+}
+.plan-lane--seal {
+  --lane-tone: var(--seal);
+  --lane-text: var(--seal);
+}
+.plan-lane + .plan-lane {
+  border-top: 1px solid var(--line-soft);
+}
+.plan-lane.is-open {
+  background: color-mix(in srgb, var(--panel2) 55%, transparent);
+}
+.plan-lane__row {
+  display: grid;
+  grid-template-columns: 212px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 14px 12px 16px;
+}
+
+.plan-lane__label {
+  display: flex;
+  align-items: stretch;
+  gap: 13px;
+  min-width: 0;
+  padding: 4px 6px 4px 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.plan-lane__bar {
+  flex: none;
+  width: 3px;
+  min-height: 44px;
+  border-radius: 2px;
+  background: var(--lane-tone);
+}
+.plan-lane__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.plan-lane__name,
+.plan-lane__goal {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-lane__name {
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  line-height: 1.35;
+}
+.plan-lane__label:hover .plan-lane__name {
+  color: var(--gold);
+}
+.plan-lane__name.is-done {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+.plan-lane__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.plan-lane__meta > span + span::before {
+  content: '·';
+  margin: 0 6px;
+  color: var(--text-faint);
+  text-decoration: none;
+}
+.plan-lane__type {
+  color: var(--lane-text);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+.plan-lane__goal {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+/* 节点轨道：li = [连线][节点]，最后一格是 [虚线][＋] */
+.plan-lane__track {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 4px 6px;
+  overflow-x: auto;
+  list-style: none;
+}
+.plan-lane__track > li {
+  display: flex;
+  flex: 1 0 auto;
+  align-items: center;
+}
+.plan-lane__track > li:first-child {
+  flex: 0 0 auto;
+}
+.plan-lane__track > li + li::before {
+  content: '';
+  flex: 1 0 20px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--gold-lo), var(--gold-hi));
+  opacity: 0.75;
+}
+.plan-lane__track > li.plan-lane__add {
+  flex-grow: 1.6;
+}
+.plan-lane__track > li.plan-lane__add::before {
+  height: 0;
+  border-top: 1px dashed color-mix(in srgb, var(--gold) 62%, transparent);
+  background: none;
+  opacity: 1;
+}
+.plan-lane__none {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.plan-beat {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  min-width: 96px;
+  max-width: 150px;
+  padding: 6px 14px 7px;
+  border: 1px solid rgba(110, 84, 44, 0.3);
+  border-radius: var(--r-md);
+  background-color: var(--paper);
+  background-image: var(--ink-grain);
+  color: var(--paper-ink);
+  font-family: var(--font-display);
+  box-shadow: 0 6px 14px -10px rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  transition:
+    box-shadow 160ms var(--ease),
+    border-color 160ms var(--ease);
+}
+.plan-beat:hover {
+  border-color: color-mix(in srgb, var(--gold) 70%, transparent);
+}
+.plan-beat__ch {
+  color: var(--paper-dim);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.plan-beat__title {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 当前进度所在的节点：鎏金框 + 顶部菱形 */
+.plan-beat.is-current {
+  border-color: var(--gold);
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--gold) 30%, transparent),
+    0 0 18px -4px color-mix(in srgb, var(--gold) 70%, transparent);
+}
+.plan-beat.is-current::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--panel);
+  background: var(--gold);
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.plan-lane__plus {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--gold) 62%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--gold);
+}
+.plan-lane__plus:hover {
+  background: var(--gold-soft);
+  border-color: var(--gold);
+}
+
+/* 展开后的完整编辑 */
+.plan-lane__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 18px 18px;
+  border-top: 1px dashed var(--line);
+}
+.plan-beat-edit {
+  padding: 10px;
+}
+.plan-beat-edit__title,
+.plan-beat-edit__summary {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text);
+}
+.plan-beat-edit__title {
+  flex: 1;
+  padding: 5px 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.plan-beat-edit__summary {
+  display: block;
+  margin-top: 6px;
+  padding: 6px 8px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+:is(.plan-beat-edit__title, .plan-beat-edit__summary):hover {
+  border-color: var(--line);
+}
+:is(.plan-beat-edit__title, .plan-beat-edit__summary)::placeholder {
+  color: var(--text-faint);
+}
+.plan-beat-edit__ch {
+  width: 58px;
+  height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .plan-lane__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      'label del'
+      'track track';
+    gap: 6px 10px;
+    padding: 12px;
+  }
+  .plan-lane__label {
+    grid-area: label;
+  }
+  .plan-lane__track {
+    grid-area: track;
+  }
+  .plan-lane__del {
+    grid-area: del;
+  }
+  .plan-lane__editor {
+    padding: 14px 12px 16px;
+  }
+}
