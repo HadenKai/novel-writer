@@ -296,5 +296,79 @@ test(
       assert.equal(failed.status, 'error')
       assert.equal(failed.errorCode, 'CODEX_RECONNECT')
     })
+
+    await t.test(
+      'restores available deleted models for only the selected account after removing the whole group',
+      async () => {
+        const sync = () => req('/api/models/subscription/sync', {})
+        const restore = connectionRef => req('/api/models/subscription/restore', { connectionRef })
+        const subscriptions = async () =>
+          (await (await req('/api/models')).json()).filter(model => model.provider === provider)
+
+        catalog = [{ slug: 'restore-me', display_name: 'Directory name' }, { slug: 'retired-model' }]
+        state = { state: 'connected', connectionRef: ref }
+        assert.equal((await sync()).status, 200)
+        const original = (await subscriptions()).find(
+          model => model.model === 'restore-me' && model.connectionRef === ref
+        )
+        assert.ok(original)
+        assert.equal(
+          (
+            await req(
+              '/api/models/' + original.id,
+              { ...original, name: 'My model', reasoningEffort: 'xhigh', isDefault: true },
+              'PUT'
+            )
+          ).status,
+          200
+        )
+        state = { state: 'connected', connectionRef: other }
+        assert.equal((await sync()).status, 200)
+        const ids = (await subscriptions()).map(model => model.id)
+        assert.equal((await req('/api/models', { ids }, 'DELETE')).status, 200)
+
+        state = { state: 'connected', connectionRef: ref }
+        catalog = [{ slug: 'restore-me', supported_reasoning_levels: [{ effort: 'xhigh' }] }]
+        assert.equal((await sync()).status, 200)
+        assert.deepEqual(await subscriptions(), [])
+
+        const mismatched = await restore(other)
+        assert.equal(mismatched.status, 400)
+        assert.equal((await mismatched.json()).code, 'CODEX_ACCOUNT_MISMATCH')
+
+        const started = catalogCalls
+        const pendingCatalog = Promise.withResolvers()
+        pauseCatalog = pendingCatalog
+        const pending = restore(ref)
+        try {
+          for (let i = 0; catalogCalls === started && i < 80; i++) await sleep(5)
+          assert.equal(catalogCalls, started + 1)
+          state = { state: 'connected', connectionRef: other }
+        } finally {
+          pendingCatalog.resolve()
+          pauseCatalog = null
+        }
+        assert.equal((await (await pending).json()).code, 'CODEX_ACCOUNT_MISMATCH')
+        assert.deepEqual(await subscriptions(), [])
+
+        state = { state: 'connected', connectionRef: ref }
+        const available = catalog
+        catalog = null
+        assert.equal((await (await restore(ref)).json()).code, 'CODEX_NETWORK')
+        catalog = available
+
+        const result = await restore(ref)
+        assert.equal(result.status, 200)
+        assert.deepEqual(await result.json(), { count: 1 })
+        const rows = await subscriptions()
+        assert.equal(rows.length, 1)
+        assert.equal(rows[0].id, original.id)
+        assert.equal(rows[0].name, 'My model')
+        assert.equal(rows[0].reasoningEffort, 'xhigh')
+        assert.deepEqual(rows[0].supportedReasoningEfforts, ['xhigh'])
+        assert.equal(rows[0].isDefault, false)
+        assert.deepEqual(await (await restore(ref)).json(), { count: 0 })
+      }
+    )
   }
 )

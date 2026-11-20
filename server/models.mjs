@@ -342,6 +342,28 @@ async function syncSubscriptionModels({ force = false } = {}) {
   }
 }
 
+async function restoreSubscriptionModels(connectionRef) {
+  const client = getCodexClient()
+  const ref = connectedCatalogRef(client)
+  if (ref !== connectionRef) throw codexError('CODEX_ACCOUNT_MISMATCH')
+  const upstream = new Map((await client.listModels(ref)).map(model => [model.id, model]))
+  let count = 0
+  await mutateModels(list => {
+    if (getCodexClient() !== client || connectedCatalogRef(client) !== ref) throw codexError('CODEX_ACCOUNT_MISMATCH')
+    for (const saved of list) {
+      if (saved.provider !== CODEX_PROVIDER || saved.connectionRef !== ref || !saved.catalogDeleted) continue
+      const model = upstream.get(saved.model)
+      if (!model) continue
+      delete saved.catalogDeleted
+      delete saved.catalogMissing
+      saved.supportedReasoningEfforts = model.reasoningEfforts
+      count++
+    }
+    return count ? list : null
+  })
+  return count
+}
+
 async function deleteModels(idSet) {
   await mutateModels(list =>
     list.filter(model => {
@@ -427,6 +449,14 @@ export function registerModelRoutes(app) {
   app.post('/api/models/subscription/sync', async (_req, res) => {
     try {
       res.json({ count: await syncSubscriptionModels({ force: true }) })
+    } catch (error) {
+      return subscriptionRouteError(res, error)
+    }
+  })
+
+  app.post('/api/models/subscription/restore', async (req, res) => {
+    try {
+      res.json({ count: await restoreSubscriptionModels(req.body?.connectionRef) })
     } catch (error) {
       return subscriptionRouteError(res, error)
     }

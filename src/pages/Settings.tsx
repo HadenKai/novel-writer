@@ -32,6 +32,8 @@ const LOCAL_QUICK = [
 const LOCAL_CONTEXT_OPTIONS = [8192, 16384, 32768, 65536, 131072]
 const catalogSyncMessage = (count: number) =>
   count ? `已同步 ${count} 个账号模型。` : '当前账号的上游目录没有可用模型。'
+const catalogRestoreMessage = (count: number) =>
+  count ? `已恢复 ${count} 个订阅模型。` : '当前账号没有可恢复的订阅模型。'
 const emptyForm = {
   id: '',
   name: '',
@@ -82,6 +84,7 @@ function ModelForm({
   const [form, setForm] = useState<ModelConfig>(initial ? { ...initial } : { ...emptyForm })
   const [saving, setSaving] = useState(false)
   const [fetching, setFetching] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const [modelNames, setModelNames] = useState<{ id: string; label: string }[]>([])
   const [fetchMsg, setFetchMsg] = useState('')
   const [error, setError] = useState('')
@@ -183,16 +186,21 @@ function ModelForm({
       onConnectionChanged()
     }
   }
-  const syncCatalog = async () => {
+  const updateCatalog = async (restoreRef?: string) => {
     const seq = ++probeSeq.current
     setFetching(true)
+    setRestoring(Boolean(restoreRef))
     setFetchMsg('')
     setError('')
     try {
-      const { count } = await api.syncSubscriptionModels()
-      if (live.current && seq === probeSeq.current) setFetchMsg(catalogSyncMessage(count))
+      const { count } = restoreRef
+        ? await api.restoreSubscriptionModels(restoreRef)
+        : await api.syncSubscriptionModels()
+      if (live.current && seq === probeSeq.current)
+        setFetchMsg(restoreRef ? catalogRestoreMessage(count) : catalogSyncMessage(count))
     } catch (e) {
-      if (live.current && seq === probeSeq.current) setError(`模型同步失败：${(e as Error).message}`)
+      if (live.current && seq === probeSeq.current)
+        setError(`模型${restoreRef ? '恢复' : '同步'}失败：${(e as Error).message}`)
     } finally {
       if (live.current && seq === probeSeq.current) setFetching(false)
       onConnectionChanged()
@@ -324,14 +332,24 @@ function ModelForm({
                     </button>
                   )}
                 {activeRef && (
-                  <button
-                    type="button"
-                    className="resources-button"
-                    onClick={syncCatalog}
-                    disabled={fetching || accountBusy}
-                  >
-                    {fetching ? '同步中…' : '同步模型'}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="resources-button"
+                      onClick={() => void updateCatalog()}
+                      disabled={fetching || accountBusy}
+                    >
+                      {fetching && !restoring ? '同步中…' : '同步模型'}
+                    </button>
+                    <button
+                      type="button"
+                      className="resources-button resources-button--quiet"
+                      onClick={() => void updateCatalog(activeRef)}
+                      disabled={fetching || accountBusy}
+                    >
+                      {fetching && restoring ? '恢复中…' : '恢复已删除模型'}
+                    </button>
+                  </>
                 )}
                 {(activeRef || needsDisconnect) && (
                   <button
@@ -370,7 +388,7 @@ function ModelForm({
               </p>
               {(fetching || fetchMsg) && (
                 <p className="resources-hint" role="status">
-                  {fetching ? '正在从 ChatGPT 同步模型…' : fetchMsg}
+                  {fetching ? (restoring ? '正在恢复订阅模型…' : '正在从 ChatGPT 同步模型…') : fetchMsg}
                 </p>
               )}
             </div>
@@ -587,7 +605,7 @@ function ModelForm({
             setShowCodex(false)
             resetConnectionState()
             onAccountChanged()
-            void syncCatalog()
+            void updateCatalog()
           }}
         />
       )}
@@ -1049,9 +1067,18 @@ export default function SettingsPage() {
     if (!ids.length || modelLock.current) return
     modelLock.current = true
     try {
+      const deletedIds = new Set(ids)
+      const modelsToDelete = models.filter(model => deletedIds.has(model.id))
+      const instructions = ['使用这些模型的作品需要重新选择模型。']
+      if (modelsToDelete.some(model => model.provider === 'chatgpt-subscription')) {
+        instructions.push('订阅模型可在「添加模型 → ChatGPT Subscription」中恢复。')
+      }
+      if (modelsToDelete.some(model => model.provider !== 'chatgpt-subscription')) {
+        instructions.push('其他模型删除后可重新添加。')
+      }
       const ok = await confirmDialog({
         title,
-        body: '此操作不可恢复。使用这些模型的作品将变为未选择模型，之后请重新选择。作品内容不会被删除。',
+        body: instructions.join('\n'),
         confirmText: '删除模型',
         danger: true
       })
@@ -1083,15 +1110,16 @@ export default function SettingsPage() {
       else next.add(key)
       return next
     })
-  const refreshGroup = async (g: ModelGroup) => {
+  const refreshGroup = async (g: ModelGroup, restoreRef?: string) => {
     if (modelLock.current) return
     modelLock.current = true
-    setModelBusy(g.key)
+    setModelBusy(restoreRef ? `restore:${g.key}` : g.key)
     setGroupErr(prev => ({ ...prev, [g.key]: '' }))
     setGroupMsg(prev => ({ ...prev, [g.key]: '' }))
     try {
-      const message =
-        g.provider === 'chatgpt-subscription'
+      const message = restoreRef
+        ? catalogRestoreMessage((await api.restoreSubscriptionModels(restoreRef)).count)
+        : g.provider === 'chatgpt-subscription'
           ? catalogSyncMessage((await api.syncSubscriptionModels()).count)
           : await api
               .importGroupModels(g.baseUrl)
@@ -1333,6 +1361,9 @@ export default function SettingsPage() {
             {groups.map((g, index) => {
               const open = !collapsed.has(g.key)
               const showUsage = g.provider === 'chatgpt-subscription' && Boolean(codex?.getUsage)
+              const activeSubscriptionRef = g.models.find(
+                model => model.connectionState === 'connected' || model.connectionState === 'catalog-missing'
+              )?.connectionRef
               return (
                 <section key={g.key} className="resources-station">
                   <div className="resources-station-header">
@@ -1367,9 +1398,20 @@ export default function SettingsPage() {
                     </span>
                     <div className="resources-actions">
                       {g.provider === 'chatgpt-subscription' ? (
-                        <button className="resources-button" disabled={modelDisabled} onClick={() => refreshGroup(g)}>
-                          {modelBusy === g.key ? '同步中…' : '同步模型'}
-                        </button>
+                        <>
+                          <button className="resources-button" disabled={modelDisabled} onClick={() => refreshGroup(g)}>
+                            {modelBusy === g.key ? '同步中…' : '同步模型'}
+                          </button>
+                          {activeSubscriptionRef && (
+                            <button
+                              className="resources-button resources-button--quiet"
+                              disabled={modelDisabled}
+                              onClick={() => refreshGroup(g, activeSubscriptionRef)}
+                            >
+                              {modelBusy === `restore:${g.key}` ? '恢复中…' : '恢复已删除模型'}
+                            </button>
+                          )}
+                        </>
                       ) : (
                         <>
                           <button
