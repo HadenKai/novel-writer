@@ -9,18 +9,33 @@ const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
 const USAGE_CACHE_MS = 60_000
 const USAGE_TIMEOUT_MS = 8_000
 const USAGE_WINDOWS = [18_000, 604_800]
+// Known plan_type values from the Codex usage payload, with hc as a Codex account alias.
 const USAGE_PLAN_LABELS = new Map([
+  ['guest', 'Guest'],
   ['free', 'Free'],
   ['go', 'Go'],
   ['plus', 'Plus'],
   ['prolite', 'Pro 100'],
   ['pro', 'Pro 200'],
   ['promax', 'Pro 500'],
+  ['free_workspace', 'Free Workspace'],
   ['team', 'Team'],
   ['business', 'Business'],
+  ['self_serve_business_prolite', 'Business Pro Lite'],
+  ['self_serve_business_usage_based', 'Business (Usage-Based)'],
   ['enterprise', 'Enterprise'],
+  ['ent26', 'Enterprise'],
+  ['hc', 'Enterprise'],
+  ['enterprise_cbp_automation', 'Enterprise (Automation)'],
+  ['enterprise_cbp_usage_based', 'Enterprise (Usage-Based)'],
   ['edu', 'Edu'],
-  ['education', 'Edu']
+  ['education', 'Edu'],
+  ['edu_plus', 'Edu Plus'],
+  ['edu_pro', 'Edu Pro'],
+  ['k12', 'K–12'],
+  ['sci', 'Academic Researchers'],
+  ['sci_plus', 'Academic Researchers Plus'],
+  ['quorum', 'Quorum']
 ])
 const CONNECT_TIMEOUT = 30_000
 const FIRST_CHUNK_TIMEOUT = 300_000
@@ -283,9 +298,9 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
         signal.throwIfAborted()
         if (usage !== account) throw codexError('CODEX_ACCOUNT_MISMATCH')
         requireUsageAccount(connectionRef)
-        const planType = payload?.plan_type
-        const planLabel =
-          typeof planType === 'string' ? USAGE_PLAN_LABELS.get(planType.trim().toLowerCase()) : undefined
+        const rawPlanType = payload?.plan_type
+        const planType = typeof rawPlanType === 'string' ? rawPlanType.trim().toLowerCase() : ''
+        const planLabel = planType ? (USAGE_PLAN_LABELS.get(planType) ?? '套餐未知') : undefined
         const snapshot = { windows: usageWindows(payload), fetchedAt: Date.now(), ...(planLabel && { planLabel }) }
         account.snapshot = snapshot
         return snapshot

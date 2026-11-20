@@ -228,22 +228,46 @@ test('Codex usage classifies windows by duration and returns only display fields
   assert.deepEqual((await client.getUsage('tenant', { force: true })).windows, [])
 })
 
-test('usage translates known subscription plan codes to their display names', async () => {
+test('usage translates all published subscription plan codes and handles future codes', async () => {
   let planType
   const { client } = fixture(async () => Response.json({ plan_type: planType, rate_limit: null }))
   for (const [raw, label] of [
+    ['guest', 'Guest'],
+    ['free', 'Free'],
+    ['go', 'Go'],
     ['plus', 'Plus'],
-    ['prolite', 'Pro 100'],
     ['pro', 'Pro 200'],
+    ['prolite', 'Pro 100'],
     ['promax', 'Pro 500'],
+    ['free_workspace', 'Free Workspace'],
+    ['team', 'Team'],
+    ['self_serve_business_prolite', 'Business Pro Lite'],
+    ['self_serve_business_usage_based', 'Business (Usage-Based)'],
     ['business', 'Business'],
-    ['constructor', undefined],
+    ['ent26', 'Enterprise'],
+    ['enterprise_cbp_automation', 'Enterprise (Automation)'],
+    ['enterprise_cbp_usage_based', 'Enterprise (Usage-Based)'],
+    ['education', 'Edu'],
+    ['quorum', 'Quorum'],
+    ['k12', 'K–12'],
+    ['enterprise', 'Enterprise'],
+    ['edu', 'Edu'],
+    ['edu_plus', 'Edu Plus'],
+    ['edu_pro', 'Edu Pro'],
+    ['sci', 'Academic Researchers'],
+    ['sci_plus', 'Academic Researchers Plus'],
+    ['unknown', '套餐未知'],
+    ['hc', 'Enterprise'],
+    ['  PROLITE ', 'Pro 100'],
+    ['future_tier', '套餐未知'],
+    ['constructor', '套餐未知'],
     [['plus'], undefined],
+    [' ', undefined],
     [null, undefined]
   ]) {
     planType = raw
     const usage = await client.getUsage('tenant', { force: true })
-    assert.equal(usage.planLabel, label)
+    assert.equal(usage.planLabel, label, `plan_type ${JSON.stringify(raw)}`)
     assert.deepEqual(usage.windows, [])
   }
 })
