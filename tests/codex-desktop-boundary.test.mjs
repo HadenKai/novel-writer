@@ -22,7 +22,10 @@ test('desktop token is scoped to the trusted window, API origin and frame', () =
       Accept: 'application/json',
       'x-novel-token': token
     })
-    assert.equal(desktopApiHeaders({ ...details, frame: undefined }, contents, origin, token)['x-novel-token'], token)
+    assert.equal(
+      desktopApiHeaders({ ...details, frame: undefined }, contents, origin, token)['x-novel-token'],
+      undefined
+    )
     for (const denied of [
       { webContentsId: 24 },
       { url: origin + '/settings' },

@@ -89,6 +89,7 @@ function ModelForm({
   const [accountBusy, setAccountBusy] = useState(false)
   const [statusVersion, setStatusVersion] = useState(0)
   const activeRef = codexStatus?.state === 'connected' ? codexStatus.connectionRef : undefined
+  const needsDisconnect = codexStatus?.state === 'disconnect-error'
   const connectionRef = form.connectionRef || activeRef
   const needsRebind = Boolean(activeRef && connectionRef && activeRef !== connectionRef)
   const showFields = !subscription || Boolean(connectionRef)
@@ -161,7 +162,7 @@ function ModelForm({
     try {
       await codex.disconnect()
     } catch {
-      if (live.current) setError('无法断开 ChatGPT 连接，请重试。')
+      if (live.current) setError(describeCodexError('CODEX_DISCONNECT_FAILED'))
     } finally {
       if (live.current) {
         connectionChanged()
@@ -295,24 +296,27 @@ function ModelForm({
             <div className="resources-field">
               <span>ChatGPT 账号 · 实验性</span>
               <div className="resources-actions">
-                {codex && codexStatus?.state !== 'connected' && codexStatus?.state !== 'unavailable' && (
-                  <button
-                    type="button"
-                    className="resources-button"
-                    onClick={() => setShowCodex(true)}
-                    disabled={!codexStatus || accountBusy}
-                  >
-                    {codexStatus?.state === 'reconnect' ? '重新连接 ChatGPT' : '连接 ChatGPT'}
-                  </button>
-                )}
-                {activeRef && (
+                {codex &&
+                  !needsDisconnect &&
+                  codexStatus?.state !== 'connected' &&
+                  codexStatus?.state !== 'unavailable' && (
+                    <button
+                      type="button"
+                      className="resources-button"
+                      onClick={() => setShowCodex(true)}
+                      disabled={!codexStatus || accountBusy}
+                    >
+                      {codexStatus?.state === 'reconnect' ? '重新连接 ChatGPT' : '连接 ChatGPT'}
+                    </button>
+                  )}
+                {(activeRef || needsDisconnect) && (
                   <button
                     type="button"
                     className="resources-button resources-button--quiet"
                     onClick={disconnect}
                     disabled={accountBusy}
                   >
-                    {accountBusy ? '正在断开…' : '断开连接'}
+                    {accountBusy ? '正在断开…' : needsDisconnect ? '重试断开连接' : '断开连接'}
                   </button>
                 )}
                 {needsRebind && (
@@ -330,13 +334,15 @@ function ModelForm({
                   ? describeCodexError('CODEX_UNAVAILABLE')
                   : !codexStatus
                     ? '正在读取连接状态…'
-                    : needsRebind
-                      ? '此模型绑定了其他账号或工作区。保存前可选择改绑。'
-                      : activeRef
-                        ? `已连接 ${codexStatus.label || 'ChatGPT'}`
-                        : codexStatus.state === 'reconnect'
-                          ? describeCodexError('CODEX_RECONNECT')
-                          : '使用 Codex 设备码连接你的 ChatGPT 账号。'}
+                    : needsDisconnect
+                      ? describeCodexError('CODEX_DISCONNECT_FAILED')
+                      : needsRebind
+                        ? '此模型绑定了其他账号或工作区。保存前可选择改绑。'
+                        : activeRef
+                          ? `已连接 ${codexStatus.label || 'ChatGPT'}`
+                          : codexStatus.state === 'reconnect'
+                            ? describeCodexError('CODEX_RECONNECT')
+                            : '使用 Codex 设备码连接你的 ChatGPT 账号。'}
               </p>
             </div>
           )}
@@ -350,6 +356,14 @@ function ModelForm({
                   placeholder="例如：日常写作 · DeepSeek"
                   autoComplete="off"
                 />
+              </label>
+              <label className="resources-inline-check">
+                <input
+                  type="checkbox"
+                  checked={form.isDefault}
+                  onChange={event => patch({ isDefault: event.target.checked })}
+                />
+                <span>设为全局默认模型</span>
               </label>
               {!subscription && (
                 <>
@@ -492,7 +506,7 @@ function ModelForm({
                     </div>
                     <p className="resources-hint">
                       {subscription
-                        ? '使用默认档位时由订阅模型决定。'
+                        ? '档位在订阅模型支持时生效。'
                         : '默认不发送 reasoning_effort 参数，其余选项由兼容服务决定是否支持。'}
                     </p>
                   </div>

@@ -15,7 +15,9 @@ export function desktopApiHeaders(details, contents, origin, token) {
     webContentsId !== contents.id ||
     !isOrigin(url, origin) ||
     !new URL(url).pathname.startsWith('/api/') ||
-    (frame && (frame !== contents.mainFrame || !isOrigin(frame.url, origin)))
+    !frame ||
+    frame !== contents.mainFrame ||
+    !isOrigin(frame.url, origin)
   )
     return requestHeaders
   const headers = Object.fromEntries(
@@ -74,7 +76,7 @@ export function registerCodexIpc({ ipcMain, getWindow, getOrigin, getAuth, getCl
     const client = getClient()
     if (!client) throw codexError('CODEX_UNAVAILABLE')
     const status = auth.status()
-    if (status.state !== 'connected') throw codexError('CODEX_RECONNECT')
+    if (status.state !== 'connected') throw codexError(status.code || 'CODEX_RECONNECT')
     return client.listModels(status.connectionRef)
   })
 }

@@ -187,6 +187,42 @@ test('terminal refresh errors require reconnection and transient errors preserve
   assert.equal(f.record().refreshToken, undefined)
 })
 
+test('failed credential removal blocks inference across restart until retried', async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'novel-codex-disconnect-'))
+  t.after(() => fs.rm(dir, { recursive: true, force: true }))
+  const filePath = path.join(dir, 'codex.enc')
+  const safeStorage = {
+    isEncryptionAvailable: () => true,
+    encryptString: text => Buffer.from(text),
+    decryptString: bytes => bytes.toString()
+  }
+  const storage = createCodexCredentialStorage({ filePath, safeStorage })
+  await storage.write({
+    state: 'connected',
+    accessToken: 'old-token',
+    refreshToken: 'old-refresh',
+    accountId: 'workspace',
+    connectionRef: 'account-ref',
+    expiresAt: Date.now() + 600_000
+  })
+  const auth = await createCodexAuth({ storage })
+  const displaced = filePath + '.locked-test-fixture'
+  await fs.rename(filePath, displaced)
+  await fs.mkdir(filePath)
+  await assert.rejects(auth.disconnect(), { code: 'CODEX_DISCONNECT_FAILED' })
+  assert.equal(auth.status().state, 'disconnect-error')
+  await assert.rejects(auth.getCredential('account-ref'), { code: 'CODEX_DISCONNECT_FAILED' })
+  await fs.rmdir(filePath)
+  await fs.rename(displaced, filePath)
+
+  const restarted = await createCodexAuth({ storage })
+  assert.equal(restarted.status().state, 'disconnect-error')
+  await assert.rejects(restarted.start(), { code: 'CODEX_DISCONNECT_FAILED' })
+  await restarted.disconnect()
+  assert.equal(restarted.status().state, 'disconnected')
+  assert.equal(await storage.read(), null)
+})
+
 test('credential storage encrypts the record with no plaintext fallback or previous backup', async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'novel-codex-auth-'))
   t.after(() => fs.rm(dir, { recursive: true, force: true }))

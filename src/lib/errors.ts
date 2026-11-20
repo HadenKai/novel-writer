@@ -33,6 +33,7 @@ export function describeModelError(job: Pick<GenJob, 'error' | 'errorStatus' | '
 
 const CODEX_HINT: Record<string, string> = {
   CODEX_RECONNECT: 'ChatGPT 授权已失效，请在 AI 模型中重新连接。',
+  CODEX_DISCONNECT_FAILED: '本机尚未完成断开，请重试断开连接。',
   CODEX_ACCOUNT_MISMATCH: '此模型绑定了其他 ChatGPT 账号或工作区，请在 AI 模型中重新绑定。',
   CODEX_MODEL_FORBIDDEN: '当前 ChatGPT 账号或工作区无法使用此模型。',
   CODEX_RATE_LIMIT: 'ChatGPT 订阅用量已达上限，请查看 ChatGPT 用量。',
@@ -47,6 +48,7 @@ export function describeCodexError(code?: string, fallback = '无法完成 ChatG
 
 export function codexModelStateLabel(state?: CodexModelConnectionState): string {
   if (state === 'reconnect') return '需要连接'
+  if (state === 'disconnect-error') return '断开未完成'
   if (state === 'account-mismatch') return '账号不匹配'
   if (state === 'unavailable') return '当前环境不可用'
   return ''

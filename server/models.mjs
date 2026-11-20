@@ -182,11 +182,13 @@ export function maskModel(m) {
   const connectionState =
     !status || status.state === 'unavailable'
       ? 'unavailable'
-      : status.state !== 'connected'
-        ? 'reconnect'
-        : status.connectionRef === m.connectionRef
-          ? 'connected'
-          : 'account-mismatch'
+      : status.state === 'disconnect-error'
+        ? 'disconnect-error'
+        : status.state !== 'connected'
+          ? 'reconnect'
+          : status.connectionRef === m.connectionRef
+            ? 'connected'
+            : 'account-mismatch'
   return { ...publicModel, connectionRef: m.connectionRef, connectionState }
 }
 
@@ -204,7 +206,7 @@ function validateModelBinding(model, previous) {
     return
   const status = getCodexClient()?.status()
   if (!status || status.state === 'unavailable') throw codexError('CODEX_UNAVAILABLE')
-  if (status.state !== 'connected') throw codexError('CODEX_RECONNECT')
+  if (status.state !== 'connected') throw codexError(status.code || 'CODEX_RECONNECT')
   if (status.connectionRef !== model.connectionRef) throw codexError('CODEX_ACCOUNT_MISMATCH')
 }
 

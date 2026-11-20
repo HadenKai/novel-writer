@@ -25,7 +25,7 @@ function textParts(content) {
     : ''
 }
 
-function requestBody({ model, messages, reasoningEffort }) {
+function requestBody({ model, messages }, reasoning) {
   const instructions = messages
     .filter(m => m.role === 'system')
     .map(m => textParts(m.content))
@@ -46,9 +46,6 @@ function requestBody({ model, messages, reasoningEffort }) {
       return { type: 'message', role: m.role, content }
     })
     .filter(m => m.content.length)
-  const reasoning = ['low', 'medium', 'high'].includes(reasoningEffort)
-    ? { effort: reasoningEffort, summary: 'auto' }
-    : null
   return {
     model,
     instructions: instructions || '你是小说工坊的创作助手。',
@@ -59,18 +56,22 @@ function requestBody({ model, messages, reasoningEffort }) {
   }
 }
 
-function workspacePermission(error) {
-  const code = String(error?.code || '').toLowerCase()
-  const message = String(error?.message || '')
-  return (
-    /workspace|region|residency|model_not_found|model_not_allowed/.test(code) ||
-    /workspace.{0,80}(?:not authorized|not allowed|permission)|not authorized in this region/i.test(message)
-  )
-}
-
 function responseFailure(status, error) {
-  if (status === 429 || /usage_limit|rate_limit|quota/i.test(error?.code || '')) return codexError('CODEX_RATE_LIMIT')
-  if (status === 403 || status === 404 || workspacePermission(error)) return codexError('CODEX_MODEL_FORBIDDEN')
+  const code = String(error?.code || error?.type || '').toLowerCase()
+  const message = typeof error === 'string' ? error : String(error?.message || '')
+  if (status === 429 || /usage_limit|rate_limit|quota/.test(code) || /(?:usage|rate) limit|quota/i.test(message)) {
+    return codexError('CODEX_RATE_LIMIT')
+  }
+  if (
+    status === 403 ||
+    status === 404 ||
+    /workspace|region|residency|model_not_found|model_not_allowed|insufficient_scope|permission_denied/.test(code) ||
+    /workspace.{0,80}(?:not authorized|not allowed|permission)|not authorized in this region|insufficient scope/i.test(
+      message
+    )
+  ) {
+    return codexError('CODEX_MODEL_FORBIDDEN')
+  }
   if (status === 401) return codexError('CODEX_RECONNECT')
   return codexError(status >= 500 ? 'CODEX_NETWORK' : 'CODEX_INVALID_RESPONSE')
 }
@@ -126,7 +127,9 @@ function finalText(response) {
 }
 
 export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0' }) {
-  async function request(path, connectionRef, options, signal, armTimeout) {
+  let catalog = null
+
+  async function request(path, connectionRef, options, signal, armTimeout, allowRefresh = true) {
     let credential = await auth.getCredential(connectionRef, { signal })
     for (let attempt = 0; attempt < 2; attempt++) {
       let response
@@ -154,14 +157,14 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
       const data = await response.json().catch(() => null)
       signal.throwIfAborted()
       const error = data?.error || data?.detail || data
-      if (response.status !== 401 || workspacePermission(error) || attempt !== 0)
-        throw responseFailure(response.status, error)
+      const failure = responseFailure(response.status, error)
+      if (!allowRefresh || response.status !== 401 || failure.code !== 'CODEX_RECONNECT' || attempt !== 0) throw failure
       credential = await auth.getCredential(connectionRef, { rejectedAccessToken: credential.accessToken, signal })
     }
   }
 
-  async function listModels(connectionRef, { signal } = {}) {
-    const timeout = AbortSignal.timeout(15_000)
+  async function listModels(connectionRef, { signal, optional = false } = {}) {
+    const timeout = AbortSignal.timeout(optional ? 4_000 : 15_000)
     const active = signal ? AbortSignal.any([signal, timeout]) : timeout
     let payload
     try {
@@ -172,7 +175,9 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
           method: 'GET',
           headers: { Accept: 'application/json' }
         },
-        active
+        active,
+        undefined,
+        !optional
       )
       payload = await response.json()
     } catch (error) {
@@ -187,15 +192,38 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
     )
     visible.sort((a, b) => (a.priority ?? 10_000) - (b.priority ?? 10_000))
     const models = new Map()
+    const capabilities = new Map()
     for (const m of visible) {
       const id = m.slug.trim()
-      if (!models.has(id))
-        models.set(id, {
-          id,
-          label: typeof m.display_name === 'string' && m.display_name.trim() ? m.display_name.trim() : id
-        })
+      if (models.has(id)) continue
+      models.set(id, {
+        id,
+        label: typeof m.display_name === 'string' && m.display_name.trim() ? m.display_name.trim() : id
+      })
+      capabilities.set(id, {
+        efforts: Array.isArray(m.supported_reasoning_levels)
+          ? m.supported_reasoning_levels.map(level => level?.effort)
+          : [],
+        summary: m.supports_reasoning_summary_parameter === true
+      })
     }
+    catalog = { connectionRef, expiresAt: Date.now() + 5 * 60_000, capabilities }
     return [...models.values()]
+  }
+
+  async function reasoningFor({ model, connectionRef, reasoningEffort }, signal) {
+    if (!['low', 'medium', 'high'].includes(reasoningEffort)) return null
+    if (catalog?.connectionRef !== connectionRef || catalog.expiresAt <= Date.now()) {
+      try {
+        await listModels(connectionRef, { signal, optional: true })
+      } catch {
+        signal.throwIfAborted()
+        catalog = { connectionRef, expiresAt: Date.now() + 30_000, capabilities: new Map() }
+      }
+    }
+    const capability = catalog?.connectionRef === connectionRef ? catalog.capabilities.get(model) : null
+    if (!capability?.efforts.includes(reasoningEffort)) return null
+    return { effort: reasoningEffort, ...(capability.summary && { summary: 'auto' }) }
   }
 
   async function* stream(options) {
@@ -210,13 +238,14 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
       timer.unref?.()
     }
     try {
+      const reasoning = await reasoningFor(options, active)
       const response = await request(
         '/responses',
         connectionRef,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-          body: JSON.stringify(requestBody(options))
+          body: JSON.stringify(requestBody(options, reasoning))
         },
         active,
         armTimeout

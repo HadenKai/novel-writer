@@ -12,6 +12,7 @@ export const CODEX_VERIFICATION_URL = ISSUER + '/codex/device'
 
 const errorMessages = {
   CODEX_RECONNECT: 'ChatGPT 授权已失效，请在 AI 模型中重新连接。',
+  CODEX_DISCONNECT_FAILED: '本机尚未完成断开，请在 AI 模型中重试断开连接。',
   CODEX_ACCOUNT_MISMATCH: '此模型绑定了其他 ChatGPT 账号或工作区，请在 AI 模型中重新绑定。',
   CODEX_MODEL_FORBIDDEN: '当前 ChatGPT 账号或工作区无法使用此模型。',
   CODEX_RATE_LIMIT: 'ChatGPT 订阅用量已达上限，请查看 ChatGPT 用量。',
@@ -106,6 +107,7 @@ export async function createCodexAuth({
         Number.isFinite(saved.expiresAt)
       )
         current = saved
+      else if (saved?.state === 'disconnect-error') current = { state: 'disconnect-error' }
       else if (saved) current = { state: 'reconnect', connectionRef: saved.connectionRef, label: saved.label }
     } catch {
       current = { state: 'reconnect' }
@@ -116,6 +118,7 @@ export async function createCodexAuth({
     if (!available()) return { state: 'unavailable', code: 'CODEX_UNAVAILABLE' }
     if (!current) return { state: 'disconnected' }
     const { state, connectionRef, label } = current
+    if (state === 'disconnect-error') return { state, code: 'CODEX_DISCONNECT_FAILED' }
     return { state, connectionRef, label, ...(state === 'reconnect' ? { code: 'CODEX_RECONNECT' } : {}) }
   }
 
@@ -222,7 +225,7 @@ export async function createCodexAuth({
         if (!isPending(record)) return
         await storage.write(next)
         if (!isPending(record)) {
-          if (current) await storage.write(current)
+          if (current && current.state !== 'disconnect-error') await storage.write(current)
           else await storage.clear()
           return
         }
@@ -244,6 +247,7 @@ export async function createCodexAuth({
 
   async function start() {
     if (!available()) throw codexError('CODEX_UNAVAILABLE')
+    if (current?.state === 'disconnect-error') throw codexError('CODEX_DISCONNECT_FAILED')
     if (active) cancel(active.attemptId)
     const record = { attemptId: randomUUID(), state: 'starting', controller: new AbortController() }
     active = record
@@ -325,6 +329,7 @@ export async function createCodexAuth({
     signal?.throwIfAborted()
     if (!available()) throw codexError('CODEX_UNAVAILABLE')
     let record = current
+    if (record?.state === 'disconnect-error') throw codexError('CODEX_DISCONNECT_FAILED')
     if (record?.state !== 'connected') throw codexError('CODEX_RECONNECT')
     if (record.connectionRef !== connectionRef) throw codexError('CODEX_ACCOUNT_MISMATCH')
     if (
@@ -355,9 +360,17 @@ export async function createCodexAuth({
   async function disconnect() {
     if (active) cancel(active.attemptId)
     epoch++
-    current = null
+    const disconnecting = { state: 'disconnect-error' }
+    current = disconnecting
     refresh?.controller.abort(codexError('CODEX_RECONNECT'))
-    await update(() => storage.clear())
+    try {
+      await update(async () => {
+        await storage.clear()
+        if (current === disconnecting) current = null
+      })
+    } catch {
+      throw codexError('CODEX_DISCONNECT_FAILED')
+    }
   }
 
   async function shutdown() {

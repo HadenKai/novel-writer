@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { codexError } from '../server/codex-oauth.mjs'
 
 export function createCodexCredentialStorage({ filePath, safeStorage }) {
+  const disconnectMarker = filePath + '.disconnecting'
   const isAvailable = () =>
     Boolean(safeStorage?.isEncryptionAvailable()) && safeStorage?.getSelectedStorageBackend?.() !== 'basic_text'
   function requireEncryption() {
@@ -14,6 +15,12 @@ export function createCodexCredentialStorage({ filePath, safeStorage }) {
     isAvailable,
     async read() {
       requireEncryption()
+      try {
+        await fs.stat(disconnectMarker)
+        return { state: 'disconnect-error' }
+      } catch (error) {
+        if (error.code !== 'ENOENT') throw error
+      }
       let encrypted
       try {
         encrypted = await fs.readFile(filePath, 'utf8')
@@ -36,7 +43,11 @@ export function createCodexCredentialStorage({ filePath, safeStorage }) {
       }
     },
     async clear() {
+      await fs.mkdir(path.dirname(filePath), { recursive: true })
+      // A locked credential file must never be treated as signed in after a restart.
+      await fs.writeFile(disconnectMarker, '', { flag: 'a', mode: 0o600 })
       await fs.rm(filePath, { force: true })
+      await fs.rm(disconnectMarker, { force: true })
     }
   }
 }

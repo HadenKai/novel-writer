@@ -228,7 +228,8 @@ export interface ParsedSettings {
 }
 
 export type ModelProvider = 'openai' | 'gemini' | 'chatgpt-subscription'
-export type CodexModelConnectionState = 'connected' | 'reconnect' | 'account-mismatch' | 'unavailable'
+export type CodexModelConnectionState =
+  'connected' | 'reconnect' | 'account-mismatch' | 'disconnect-error' | 'unavailable'
 
 export interface ModelConfig {
   id: string

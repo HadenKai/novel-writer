@@ -5,7 +5,7 @@
  * 有的写全有的只写 pickFolder。统一到这里，改一处即可。
  */
 export interface CodexConnectionStatus {
-  state: 'disconnected' | 'connected' | 'reconnect' | 'unavailable'
+  state: 'disconnected' | 'connected' | 'reconnect' | 'disconnect-error' | 'unavailable'
   connectionRef?: string
   label?: string
   code?: string

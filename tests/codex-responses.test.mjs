@@ -19,7 +19,7 @@ const opts = {
   ],
   temperature: 0.8,
   maxTokens: 100,
-  reasoningEffort: 'medium'
+  reasoningEffort: 'default'
 }
 const event = (type, fields = {}) => ({ type, ...fields })
 function sse(...events) {
@@ -120,7 +120,10 @@ test('codex refreshes a pre-stream 401 once, reports quotas or permissions, and 
     [401, 'CODEX_RECONNECT'],
     [403, 'CODEX_MODEL_FORBIDDEN'],
     [429, 'CODEX_RATE_LIMIT'],
-    [401, 'CODEX_MODEL_FORBIDDEN', { error: { code: 'workspace_not_authorized' } }]
+    [401, 'CODEX_MODEL_FORBIDDEN', { error: { code: 'workspace_not_authorized' } }],
+    [401, 'CODEX_MODEL_FORBIDDEN', { error: { code: 'insufficient_scope' } }],
+    [401, 'CODEX_MODEL_FORBIDDEN', { detail: 'workspace is not authorized for this model' }],
+    [401, 'CODEX_RATE_LIMIT', { error: { code: 'usage_limit_reached' } }]
   ]) {
     const f = fixture(async () => Response.json(body, { status }))
     await assert.rejects(read(f.client.stream(opts)), { code })
@@ -137,6 +140,47 @@ test('codex refreshes a pre-stream 401 once, reports quotas or permissions, and 
   abort.abort()
   await abortSeen.promise
   await assert.rejects(iter.next(), { name: 'AbortError' })
+})
+
+test('reasoning options follow the account catalog and unknown models use upstream defaults', async () => {
+  const bodies = []
+  let catalogCalls = 0
+  const { client } = fixture(async (url, options) => {
+    if (url.includes('/models?')) {
+      catalogCalls++
+      return Response.json({
+        models: [
+          {
+            slug: 'with-summary',
+            supported_reasoning_levels: [{ effort: 'low' }],
+            supports_reasoning_summary_parameter: true
+          },
+          {
+            slug: 'without-summary',
+            supported_reasoning_levels: [{ effort: 'medium' }],
+            supports_reasoning_summary_parameter: false
+          },
+          { slug: 'no-effort', supported_reasoning_levels: [] }
+        ]
+      })
+    }
+    bodies.push(JSON.parse(options.body))
+    return sse(complete)
+  })
+  for (const [model, reasoningEffort] of [
+    ['with-summary', 'low'],
+    ['without-summary', 'medium'],
+    ['no-effort', 'high'],
+    ['manual-id', 'high'],
+    ['with-summary', 'high']
+  ]) {
+    await read(client.stream({ ...opts, model, reasoningEffort }))
+  }
+  assert.equal(catalogCalls, 1)
+  assert.deepEqual(
+    bodies.map(body => body.reasoning),
+    [{ effort: 'low', summary: 'auto' }, { effort: 'medium' }, undefined, undefined, undefined]
+  )
 })
 
 test('account catalog presents only unique visible slugs in account order', async () => {
