@@ -563,6 +563,36 @@
   white-space: nowrap;
 }
 
+.resources-scope .resources-subscription-account {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.resources-scope .resources-subscription-email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.resources-scope .resources-subscription-plan {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--gold) 38%, transparent);
+  border-radius: 999px;
+  background: var(--gold-soft);
+  color: var(--gold);
+  font-weight: 650;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
 .resources-scope .resources-subscription-usage {
   position: relative;
   max-width: 100%;

@@ -60,6 +60,12 @@ function jwtClaims(value) {
   }
 }
 
+function accountEmail(value) {
+  if (typeof value !== 'string') return undefined
+  const email = value.trim()
+  return email.length <= 254 && /^[^\s@]+@[^\s@]+$/.test(email) ? email : undefined
+}
+
 // These claims come from the token just returned over TLS by the configured issuer.
 // They route model requests and link a saved local connection, not validate a login from the renderer.
 function tokenRecord(data, now, previous) {
@@ -81,7 +87,10 @@ function tokenRecord(data, now, previous) {
   const connectionRef = createHash('sha256')
     .update(JSON.stringify(['novel-writer-codex', subject, accountId]))
     .digest('hex')
-  const label = typeof claims[PROFILE_CLAIM]?.email === 'string' ? claims[PROFILE_CLAIM].email.slice(0, 128) : 'ChatGPT'
+  const label =
+    accountEmail(claims[PROFILE_CLAIM]?.email) ||
+    (previous?.connectionRef === connectionRef && accountEmail(previous.label)) ||
+    'ChatGPT'
   const residency = auth.chatgpt_data_residency || auth.chatgpt_compute_residency
   return {
     state: 'connected',
@@ -130,9 +139,10 @@ export async function createCodexAuth({
         saved.accountId &&
         saved.connectionRef &&
         Number.isFinite(saved.expiresAt)
-      )
-        current = saved
-      else if (saved?.state === 'disconnect-error') current = { state: 'disconnect-error' }
+      ) {
+        const email = accountEmail(jwtClaims(saved.accessToken)?.[PROFILE_CLAIM]?.email)
+        current = email ? { ...saved, label: email } : saved
+      } else if (saved?.state === 'disconnect-error') current = { state: 'disconnect-error' }
       else if (saved) current = { state: 'reconnect', connectionRef: saved.connectionRef, label: saved.label }
     } catch {
       current = { state: 'reconnect' }
@@ -144,7 +154,14 @@ export async function createCodexAuth({
     if (!current) return { state: 'disconnected' }
     const { state, connectionRef, label } = current
     if (state === 'disconnect-error') return { state, code: 'CODEX_DISCONNECT_FAILED' }
-    return { state, connectionRef, label, ...(state === 'reconnect' ? { code: 'CODEX_RECONNECT' } : {}) }
+    const email = state === 'connected' ? accountEmail(label) : undefined
+    return {
+      state,
+      connectionRef,
+      label,
+      ...(email && { email }),
+      ...(state === 'reconnect' ? { code: 'CODEX_RECONNECT' } : {})
+    }
   }
 
   function update(action) {

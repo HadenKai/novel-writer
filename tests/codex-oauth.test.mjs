@@ -7,18 +7,24 @@ import { createCodexAuth } from '../server/codex-oauth.mjs'
 import { createCodexCredentialStorage } from '../electron/codex-credentials.mjs'
 
 const authClaim = 'https://api.openai.com/auth'
+const profileClaim = 'https://api.openai.com/profile'
 const json = (data, status = 200) => Response.json(data, { status })
 const deferred = () => Promise.withResolvers()
-const jwt = (now, accountId = 'workspace-A', duration = 1000) =>
+const jwt = (now, accountId = 'workspace-A', duration = 1000, email) =>
   'header.' +
   Buffer.from(
-    JSON.stringify({ sub: 'user-A', exp: now / 1000 + duration, [authClaim]: { chatgpt_account_id: accountId } })
+    JSON.stringify({
+      sub: 'user-A',
+      exp: now / 1000 + duration,
+      [authClaim]: { chatgpt_account_id: accountId },
+      ...(email && { [profileClaim]: { email } })
+    })
   ).toString('base64url') +
   '.signature'
 
-function fixture({ issue, poll, exchange, refresh, deadline = 60, initialNow = 1_000_000 } = {}) {
+function fixture({ issue, poll, exchange, refresh, deadline = 60, initialNow = 1_000_000, initialRecord = null } = {}) {
   let now = initialNow
-  let record = null
+  let record = initialRecord
   let writes = 0
   const calls = []
   const auth = createCodexAuth({
@@ -131,6 +137,27 @@ test('device authorization polls pending states and persists only the current at
   await new Promise(resolve => setImmediate(resolve))
   assert.equal(b.attempt(doomed.attemptId).state, 'cancelled')
   assert.equal(late.writes(), 0)
+})
+
+test('connected status keeps the complete email for saved and refreshed sessions', async () => {
+  const email = 'a'.repeat(55) + '@' + 'b'.repeat(55) + '.' + 'c'.repeat(25) + '.example'
+  const f = fixture({
+    exchange: now => json({ access_token: jwt(now, 'workspace-A', 1000, email), refresh_token: 'rotate' })
+  })
+  const a = await f.auth
+  const { attemptId } = await a.start()
+  await waitFor(a, attemptId, 'connected')
+  const { connectionRef } = a.status()
+  assert.equal(a.status().email, email)
+
+  const saved = { ...f.record(), label: email.slice(0, 128) }
+  const restarted = await fixture({ initialRecord: saved }).auth
+  assert.equal(restarted.status().email, email)
+  // A refresh without a profile claim must keep the same account's address.
+  await restarted.getCredential(connectionRef, { rejectedAccessToken: saved.accessToken })
+  assert.equal(restarted.status().email, email)
+  await restarted.disconnect()
+  assert.equal(restarted.status().email, undefined)
 })
 
 test('device polling honours expiration and a bounded number of network failures', async () => {

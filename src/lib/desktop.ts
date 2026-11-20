@@ -8,6 +8,7 @@ export interface CodexConnectionStatus {
   state: 'disconnected' | 'connected' | 'reconnect' | 'disconnect-error' | 'unavailable'
   connectionRef?: string
   label?: string
+  email?: string
   code?: string
 }
 
@@ -22,6 +23,7 @@ export interface CodexAttemptStatus {
 export interface CodexUsageSnapshot {
   windows: { durationSeconds: number; remainingPercent: number; resetsAt: number | null }[]
   fetchedAt: number
+  planLabel?: string
 }
 
 export interface CodexDesktopAPI {

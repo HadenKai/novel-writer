@@ -9,6 +9,19 @@ const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
 const USAGE_CACHE_MS = 60_000
 const USAGE_TIMEOUT_MS = 8_000
 const USAGE_WINDOWS = [18_000, 604_800]
+const USAGE_PLAN_LABELS = new Map([
+  ['free', 'Free'],
+  ['go', 'Go'],
+  ['plus', 'Plus'],
+  ['prolite', 'Pro 100'],
+  ['pro', 'Pro 200'],
+  ['promax', 'Pro 500'],
+  ['team', 'Team'],
+  ['business', 'Business'],
+  ['enterprise', 'Enterprise'],
+  ['edu', 'Edu'],
+  ['education', 'Edu']
+])
 const CONNECT_TIMEOUT = 30_000
 const FIRST_CHUNK_TIMEOUT = 300_000
 const CHUNK_TIMEOUT = 120_000
@@ -270,7 +283,10 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
         signal.throwIfAborted()
         if (usage !== account) throw codexError('CODEX_ACCOUNT_MISMATCH')
         requireUsageAccount(connectionRef)
-        const snapshot = { windows: usageWindows(payload), fetchedAt: Date.now() }
+        const planType = payload?.plan_type
+        const planLabel =
+          typeof planType === 'string' ? USAGE_PLAN_LABELS.get(planType.trim().toLowerCase()) : undefined
+        const snapshot = { windows: usageWindows(payload), fetchedAt: Date.now(), ...(planLabel && { planLabel }) }
         account.snapshot = snapshot
         return snapshot
       } catch (error) {

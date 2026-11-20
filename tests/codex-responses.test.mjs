@@ -228,6 +228,26 @@ test('Codex usage classifies windows by duration and returns only display fields
   assert.deepEqual((await client.getUsage('tenant', { force: true })).windows, [])
 })
 
+test('usage translates known subscription plan codes to their display names', async () => {
+  let planType
+  const { client } = fixture(async () => Response.json({ plan_type: planType, rate_limit: null }))
+  for (const [raw, label] of [
+    ['plus', 'Plus'],
+    ['prolite', 'Pro 100'],
+    ['pro', 'Pro 200'],
+    ['promax', 'Pro 500'],
+    ['business', 'Business'],
+    ['constructor', undefined],
+    [['plus'], undefined],
+    [null, undefined]
+  ]) {
+    planType = raw
+    const usage = await client.getUsage('tenant', { force: true })
+    assert.equal(usage.planLabel, label)
+    assert.deepEqual(usage.windows, [])
+  }
+})
+
 test('a pending usage request cannot surface an earlier account after its cache is cleared', async () => {
   const started = Promise.withResolvers()
   const reply = Promise.withResolvers()

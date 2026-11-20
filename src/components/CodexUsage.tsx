@@ -17,6 +17,7 @@ function windowLabel(seconds: number) {
 
 export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
   const [snapshot, setSnapshot] = useState<CodexUsageSnapshot | null>()
+  const [email, setEmail] = useState<string>()
   const [refresh, setRefresh] = useState(0)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -26,6 +27,14 @@ export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
   useEffect(() => {
     let active = true
     function loadUsage(force: boolean) {
+      void codex.status().then(
+        status => {
+          if (active) setEmail(status.state === 'connected' ? status.email : undefined)
+        },
+        () => {
+          if (active) setEmail(undefined)
+        }
+      )
       void codex.getUsage(force).then(
         usage => {
           if (active) setSnapshot(usage)
@@ -73,81 +82,91 @@ export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
     : status
 
   return (
-    <div className="resources-subscription-usage" ref={rootRef}>
-      <button
-        type="button"
-        ref={triggerRef}
-        className="resources-subscription-usage-trigger"
-        aria-label={`Codex 用量，${summary}`}
-        aria-controls={panelId}
-        aria-expanded={open}
-        onClick={() => setOpen(value => !value)}
-      >
-        {windows.length ? (
-          windows.map(window => (
-            <span key={window.durationSeconds} className="resources-subscription-usage-window">
-              <span>{windowLabel(window.durationSeconds)}剩余</span>
-              <span className="resources-usage-meter" aria-hidden="true">
-                <span style={{ width: `${window.remainingPercent}%` }} />
-              </span>
-              <strong>{percent.format(window.remainingPercent)}%</strong>
-            </span>
-          ))
-        ) : (
-          <span role="status">{status}</span>
-        )}
-      </button>
-      <div
-        id={panelId}
-        hidden={!open}
-        className="resources-subscription-usage-panel"
-        role="group"
-        aria-label="订阅用量详情"
-      >
-        <div className="resources-subscription-usage-heading">
-          <strong>用量详情</strong>
-          <button
-            type="button"
-            className="resources-subscription-usage-close"
-            aria-label="关闭用量详情"
-            onClick={() => {
-              setOpen(false)
-              triggerRef.current?.focus()
-            }}
-          >
-            ×
-          </button>
+    <>
+      {(email || snapshot?.planLabel) && (
+        <div className="resources-subscription-account">
+          {email && <span className="resources-subscription-email">{email}</span>}
+          {snapshot?.planLabel && <span className="resources-subscription-plan">{snapshot.planLabel}</span>}
         </div>
-        {windows.length ? (
-          <dl>
-            {windows.map(window => (
-              <div key={window.durationSeconds}>
-                <dt>{windowLabel(window.durationSeconds)}重置</dt>
-                <dd>
-                  {window.resetsAt ? (
-                    <time dateTime={new Date(window.resetsAt).toISOString()}>{resetTime.format(window.resetsAt)}</time>
-                  ) : (
-                    '时间未知'
-                  )}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        ) : (
-          <p className="resources-hint">{status}</p>
-        )}
+      )}
+      <div className="resources-subscription-usage" ref={rootRef}>
         <button
           type="button"
-          className="resources-button resources-button--quiet"
-          disabled={loading}
-          onClick={() => {
-            setSnapshot(undefined)
-            setRefresh(count => count + 1)
-          }}
+          ref={triggerRef}
+          className="resources-subscription-usage-trigger"
+          aria-label={`Codex 用量，${summary}`}
+          aria-controls={panelId}
+          aria-expanded={open}
+          onClick={() => setOpen(value => !value)}
         >
-          刷新用量
+          {windows.length ? (
+            windows.map(window => (
+              <span key={window.durationSeconds} className="resources-subscription-usage-window">
+                <span>{windowLabel(window.durationSeconds)}剩余</span>
+                <span className="resources-usage-meter" aria-hidden="true">
+                  <span style={{ width: `${window.remainingPercent}%` }} />
+                </span>
+                <strong>{percent.format(window.remainingPercent)}%</strong>
+              </span>
+            ))
+          ) : (
+            <span role="status">{status}</span>
+          )}
         </button>
+        <div
+          id={panelId}
+          hidden={!open}
+          className="resources-subscription-usage-panel"
+          role="group"
+          aria-label="订阅用量详情"
+        >
+          <div className="resources-subscription-usage-heading">
+            <strong>用量详情</strong>
+            <button
+              type="button"
+              className="resources-subscription-usage-close"
+              aria-label="关闭用量详情"
+              onClick={() => {
+                setOpen(false)
+                triggerRef.current?.focus()
+              }}
+            >
+              ×
+            </button>
+          </div>
+          {windows.length ? (
+            <dl>
+              {windows.map(window => (
+                <div key={window.durationSeconds}>
+                  <dt>{windowLabel(window.durationSeconds)}重置</dt>
+                  <dd>
+                    {window.resetsAt ? (
+                      <time dateTime={new Date(window.resetsAt).toISOString()}>
+                        {resetTime.format(window.resetsAt)}
+                      </time>
+                    ) : (
+                      '时间未知'
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          ) : (
+            <p className="resources-hint">{status}</p>
+          )}
+          <button
+            type="button"
+            className="resources-button resources-button--quiet"
+            disabled={loading}
+            onClick={() => {
+              setSnapshot(undefined)
+              setRefresh(count => count + 1)
+            }}
+          >
+            刷新用量
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   )
 }
