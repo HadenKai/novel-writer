@@ -574,7 +574,13 @@
   font-size: 12px;
 }
 
-.resources-scope :is(.resources-subscription-email, .resources-subscription-plan) {
+.resources-scope
+  :is(
+    .resources-subscription-email,
+    .resources-subscription-plan,
+    .resources-subscription-usage-window,
+    .resources-subscription-usage-status
+  ) {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
@@ -614,32 +620,41 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 5px 12px;
+  gap: 4px 8px;
   max-width: 100%;
-  padding: 5px 8px;
-  border: 1px solid var(--line-soft);
+  padding: 0;
+  border: 0;
   border-radius: 6px;
   background: transparent;
   color: inherit;
   text-align: left;
 }
 
-.resources-scope .resources-subscription-usage-trigger:hover,
-.resources-scope .resources-subscription-usage-trigger[aria-expanded='true'] {
-  border-color: var(--line);
-  color: var(--text);
+.resources-scope .resources-subscription-usage-status {
+  border-color: var(--line-soft);
 }
 
 .resources-scope .resources-subscription-usage-window {
-  display: inline-flex;
-  align-items: center;
+  --usage-tone: var(--jade);
   gap: 6px;
+  border-color: color-mix(in srgb, var(--usage-tone) 38%, transparent);
+  background: color-mix(in srgb, var(--usage-tone) 13%, transparent);
+  color: color-mix(in srgb, var(--usage-tone) 80%, var(--text));
   white-space: nowrap;
 }
 
-.resources-scope .resources-subscription-usage-window strong {
-  color: var(--text);
-  font-weight: 600;
+.resources-scope .resources-subscription-usage-window[data-tone='low'] {
+  --usage-tone: var(--amber);
+}
+
+.resources-scope .resources-subscription-usage-window[data-tone='critical'] {
+  --usage-tone: var(--seal);
+}
+
+.resources-scope
+  .resources-subscription-usage-trigger:is(:hover, [aria-expanded='true'])
+  > .resources-subscription-usage-window {
+  border-color: color-mix(in srgb, var(--usage-tone) 62%, transparent);
 }
 
 .resources-scope .resources-usage-meter {
@@ -654,7 +669,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--gold);
+  background: var(--usage-tone);
 }
 
 .resources-scope .resources-subscription-usage-panel {

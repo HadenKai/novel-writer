@@ -15,6 +15,12 @@ function windowLabel(seconds: number) {
   return seconds === 18_000 ? '5 小时' : '7 天'
 }
 
+function usageTone(remainingPercent: number) {
+  if (remainingPercent <= 10) return 'critical'
+  if (remainingPercent <= 30) return 'low'
+  return 'normal'
+}
+
 export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
   const [snapshot, setSnapshot] = useState<CodexUsageSnapshot | null>()
   const [email, setEmail] = useState<string>()
@@ -101,7 +107,11 @@ export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
         >
           {windows.length ? (
             windows.map(window => (
-              <span key={window.durationSeconds} className="resources-subscription-usage-window">
+              <span
+                key={window.durationSeconds}
+                className="resources-subscription-usage-window"
+                data-tone={usageTone(window.remainingPercent)}
+              >
                 <span>{windowLabel(window.durationSeconds)}剩余</span>
                 <span className="resources-usage-meter" aria-hidden="true">
                   <span style={{ width: `${window.remainingPercent}%` }} />
@@ -110,7 +120,9 @@ export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
               </span>
             ))
           ) : (
-            <span role="status">{status}</span>
+            <span className="resources-subscription-usage-status" role="status">
+              {status}
+            </span>
           )}
         </button>
         <div
