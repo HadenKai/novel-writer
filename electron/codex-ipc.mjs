@@ -71,7 +71,17 @@ export function registerCodexIpc({ ipcMain, getWindow, getOrigin, getAuth, getCl
   register('attempt', (auth, id) => auth.attempt(id))
   register('open-verification', openVerification)
   register('cancel', (auth, id) => auth.cancel(id))
-  register('disconnect', auth => auth.disconnect())
+  register('disconnect', auth => {
+    getClient()?.clearUsage()
+    return auth.disconnect()
+  })
+  register('usage', (auth, force) => {
+    const client = getClient()
+    if (!client) throw codexError('CODEX_UNAVAILABLE')
+    const status = auth.status()
+    if (status.state !== 'connected') throw codexError(status.code || 'CODEX_RECONNECT')
+    return client.getUsage(status.connectionRef, { force: force === true })
+  })
   register('list-models', auth => {
     const client = getClient()
     if (!client) throw codexError('CODEX_UNAVAILABLE')

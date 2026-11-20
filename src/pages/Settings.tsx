@@ -6,6 +6,7 @@ import { reasoningSteps, thinkingValue } from '../lib/thinking'
 import { confirmDialog, alertDialog } from '../components/Dialog'
 import ModalShell from '../components/ModalShell'
 import CodexConnectionDialog from '../components/CodexConnectionDialog'
+import CodexUsage from '../components/CodexUsage'
 import { desktop, type CodexConnectionStatus } from '../lib/desktop'
 import { codexModelStateLabel, describeCodexError } from '../lib/errors'
 import type { ModelConfig, ModelProvider } from '../types'
@@ -69,12 +70,14 @@ function ModelForm({
   initial,
   onDone,
   onCancel,
-  onConnectionChanged
+  onConnectionChanged,
+  onAccountChanged
 }: {
   initial: ModelConfig | null
   onDone: () => void
   onCancel: () => void
   onConnectionChanged: () => void
+  onAccountChanged: () => void
 }) {
   const [form, setForm] = useState<ModelConfig>(initial ? { ...initial } : { ...emptyForm })
   const [saving, setSaving] = useState(false)
@@ -154,14 +157,13 @@ function ModelForm({
     }
   }
 
-  const connectionChanged = (reload = true) => {
+  const resetConnectionState = () => {
     probeSeq.current++
     setFetching(false)
     setModelNames([])
     setFetchMsg('')
     setCodexStatus(null)
     setStatusVersion(value => value + 1)
-    if (reload) onConnectionChanged()
   }
 
   const disconnect = async () => {
@@ -173,10 +175,12 @@ function ModelForm({
     } catch {
       if (live.current) setError(describeCodexError('CODEX_DISCONNECT_FAILED'))
     } finally {
+      onAccountChanged()
       if (live.current) {
-        connectionChanged()
+        resetConnectionState()
         setAccountBusy(false)
       }
+      onConnectionChanged()
     }
   }
   const syncCatalog = async () => {
@@ -581,7 +585,8 @@ function ModelForm({
           onClose={() => setShowCodex(false)}
           onConnected={() => {
             setShowCodex(false)
-            connectionChanged(false)
+            resetConnectionState()
+            onAccountChanged()
             void syncCatalog()
           }}
         />
@@ -940,6 +945,8 @@ function LocalModelDialog({ onDone, onCancel }: { onDone: () => void; onCancel: 
 }
 
 export default function SettingsPage() {
+  const codex = desktop()?.codex
+  const [usageVersion, setUsageVersion] = useState(0)
   const [models, setModels] = useState<ModelConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -1325,23 +1332,29 @@ export default function SettingsPage() {
           <div className="resources-stations">
             {groups.map((g, index) => {
               const open = !collapsed.has(g.key)
+              const showUsage = g.provider === 'chatgpt-subscription' && Boolean(codex?.getUsage)
               return (
                 <section key={g.key} className="resources-station">
                   <div className="resources-station-header">
-                    <button
-                      className="resources-station-toggle"
-                      aria-expanded={open}
-                      aria-controls={`station-models-${index}`}
-                      onClick={() => toggleGroup(g.key)}
+                    <div
+                      className={`resources-station-identity${showUsage ? ' resources-station-identity--usage' : ''}`}
                     >
-                      <span className="resources-chevron" aria-hidden="true">
-                        {open ? '⌄' : '›'}
-                      </span>
-                      <span>
-                        <strong>{g.label}</strong>
-                        {g.baseUrl && <span className="resources-row-detail">{g.baseUrl}</span>}
-                      </span>
-                    </button>
+                      <button
+                        className="resources-station-toggle"
+                        aria-expanded={open}
+                        aria-controls={`station-models-${index}`}
+                        onClick={() => toggleGroup(g.key)}
+                      >
+                        <span className="resources-chevron" aria-hidden="true">
+                          {open ? '⌄' : '›'}
+                        </span>
+                        <span>
+                          <strong>{g.label}</strong>
+                          {g.baseUrl && <span className="resources-row-detail">{g.baseUrl}</span>}
+                        </span>
+                      </button>
+                      {showUsage && codex && <CodexUsage key={usageVersion} codex={codex} />}
+                    </div>
                     <span className="resources-count">
                       {g.models.length} 个模型 ·{' '}
                       {g.provider === 'chatgpt-subscription'
@@ -1587,6 +1600,7 @@ export default function SettingsPage() {
       {showForm && (
         <ModelForm
           initial={editing}
+          onAccountChanged={() => setUsageVersion(value => value + 1)}
           onConnectionChanged={() => {
             setTestResult(results =>
               Object.fromEntries(

@@ -5,6 +5,10 @@ export const CODEX_REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const BASE = 'https://chatgpt.com/backend-api/codex'
 // This endpoint filters models by Codex client compatibility, independently of the app's own version.
 const CATALOG_CLIENT_VERSION = '0.171.0'
+const USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage'
+const USAGE_CACHE_MS = 60_000
+const USAGE_TIMEOUT_MS = 8_000
+const USAGE_WINDOWS = [18_000, 604_800]
 const CONNECT_TIMEOUT = 30_000
 const FIRST_CHUNK_TIMEOUT = 300_000
 const CHUNK_TIMEOUT = 120_000
@@ -130,16 +134,38 @@ function finalText(response) {
     .join('')
 }
 
+function usageWindows(payload) {
+  const rateLimit = payload?.rate_limit
+  const windows = [rateLimit?.primary_window, rateLimit?.secondary_window]
+  return USAGE_WINDOWS.flatMap(durationSeconds => {
+    const window = windows.find(
+      item => item?.limit_window_seconds === durationSeconds && Number.isFinite(item.used_percent)
+    )
+    if (!window) return []
+    return [
+      {
+        durationSeconds,
+        remainingPercent: Math.min(100, Math.max(0, 100 - window.used_percent)),
+        resetsAt:
+          Number.isSafeInteger(window.reset_at) && window.reset_at > 0 && window.reset_at <= 8_640_000_000_000
+            ? window.reset_at * 1000
+            : null
+      }
+    ]
+  })
+}
+
 export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0' }) {
   let catalog = null
+  let usage = null
 
-  async function request(path, connectionRef, options, signal, armTimeout, allowRefresh = true) {
+  async function request(url, connectionRef, options, signal, armTimeout, allowRefresh = true) {
     let credential = await auth.getCredential(connectionRef, { signal })
     for (let attempt = 0; attempt < 2; attempt++) {
       let response
       try {
         armTimeout?.(CONNECT_TIMEOUT)
-        response = await fetchImpl(BASE + path, {
+        response = await fetchImpl(url, {
           ...options,
           redirect: 'error',
           headers: {
@@ -173,7 +199,7 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
     let payload
     try {
       const response = await request(
-        '/models?client_version=' + CATALOG_CLIENT_VERSION,
+        BASE + '/models?client_version=' + CATALOG_CLIENT_VERSION,
         connectionRef,
         {
           method: 'GET',
@@ -216,6 +242,48 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
     return [...models.values()]
   }
 
+  function requireUsageAccount(connectionRef) {
+    const status = auth.status()
+    if (status.state !== 'connected') throw codexError(status.code || 'CODEX_RECONNECT')
+    if (status.connectionRef !== connectionRef) throw codexError('CODEX_ACCOUNT_MISMATCH')
+  }
+
+  async function getUsage(connectionRef, { force = false } = {}) {
+    requireUsageAccount(connectionRef)
+    if (usage?.connectionRef !== connectionRef) usage = { connectionRef, snapshot: null, pending: null }
+    const account = usage
+    if (account.pending) return account.pending
+    if (!force && account.snapshot && Date.now() - account.snapshot.fetchedAt < USAGE_CACHE_MS) {
+      return account.snapshot
+    }
+
+    const signal = AbortSignal.timeout(USAGE_TIMEOUT_MS)
+    account.pending = (async () => {
+      try {
+        const response = await request(
+          USAGE_URL,
+          connectionRef,
+          { method: 'GET', headers: { Accept: 'application/json' } },
+          signal
+        )
+        const payload = await response.json()
+        signal.throwIfAborted()
+        if (usage !== account) throw codexError('CODEX_ACCOUNT_MISMATCH')
+        requireUsageAccount(connectionRef)
+        const snapshot = { windows: usageWindows(payload), fetchedAt: Date.now() }
+        account.snapshot = snapshot
+        return snapshot
+      } catch (error) {
+        if (signal.aborted) throw codexError('CODEX_NETWORK')
+        if (String(error?.code || '').startsWith('CODEX_')) throw error
+        throw codexError('CODEX_INVALID_RESPONSE')
+      } finally {
+        account.pending = null
+      }
+    })()
+    return account.pending
+  }
+
   async function reasoningFor({ model, connectionRef, reasoningEffort }, signal) {
     if (!CODEX_REASONING_EFFORTS.includes(reasoningEffort)) return null
     if (catalog?.connectionRef !== connectionRef || catalog.expiresAt <= Date.now()) {
@@ -246,7 +314,7 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
     try {
       const reasoning = await reasoningFor(options, active)
       const response = await request(
-        '/responses',
+        BASE + '/responses',
         connectionRef,
         {
           method: 'POST',
@@ -292,5 +360,13 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
     }
   }
 
-  return { status: () => auth.status(), listModels, stream }
+  return {
+    status: () => auth.status(),
+    listModels,
+    getUsage,
+    clearUsage: () => {
+      usage = null
+    },
+    stream
+  }
 }

@@ -9,7 +9,8 @@ contextBridge.exposeInMainWorld('novelAPI', {
     openVerification: id => ipcRenderer.invoke('codex:open-verification', id),
     cancel: id => ipcRenderer.invoke('codex:cancel', id),
     disconnect: () => ipcRenderer.invoke('codex:disconnect'),
-    listModels: () => ipcRenderer.invoke('codex:list-models')
+    listModels: () => ipcRenderer.invoke('codex:list-models'),
+    getUsage: force => ipcRenderer.invoke('codex:usage', force === true)
   },
   // 自绘标题栏的窗口控制
   winMinimize: () => ipcRenderer.invoke('win:minimize'),

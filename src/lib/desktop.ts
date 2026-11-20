@@ -19,6 +19,11 @@ export interface CodexAttemptStatus {
   code?: string
 }
 
+export interface CodexUsageSnapshot {
+  windows: { durationSeconds: number; remainingPercent: number; resetsAt: number | null }[]
+  fetchedAt: number
+}
+
 export interface CodexDesktopAPI {
   status: () => Promise<CodexConnectionStatus>
   start: () => Promise<CodexAttemptStatus>
@@ -27,6 +32,7 @@ export interface CodexDesktopAPI {
   cancel: (id: string) => Promise<void>
   disconnect: () => Promise<void>
   listModels: () => Promise<{ id: string; label: string }[]>
+  getUsage: (force?: boolean) => Promise<CodexUsageSnapshot>
 }
 
 export interface DesktopAPI {

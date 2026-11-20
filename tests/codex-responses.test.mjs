@@ -196,6 +196,52 @@ test('reasoning options follow the account catalog and unknown models use upstre
   )
 })
 
+test('Codex usage classifies windows by duration and returns only display fields', async () => {
+  const weekly = { used_percent: 58, limit_window_seconds: 604800, reset_at: 1_800_000_000 }
+  const session = { used_percent: 0, limit_window_seconds: 18000, reset_at: 1_799_999_000 }
+  let windows = { primary_window: weekly, secondary_window: session }
+  let calls = 0
+  const { client } = fixture(async (url, { method, headers }) => {
+    calls++
+    assert.equal(url, 'https://chatgpt.com/backend-api/wham/usage')
+    assert.equal(method, 'GET')
+    assert.equal(headers['ChatGPT-Account-ID'], 'account-A')
+    return Response.json({
+      account_id: 'not-for-renderer',
+      rate_limit: windows,
+      additional_rate_limits: [{ rate_limit: { primary_window: session } }]
+    })
+  })
+  const full = await client.getUsage('tenant')
+  assert.deepEqual(full.windows, [
+    { durationSeconds: 18000, remainingPercent: 100, resetsAt: 1_799_999_000_000 },
+    { durationSeconds: 604800, remainingPercent: 42, resetsAt: 1_800_000_000_000 }
+  ])
+  assert.deepEqual(Object.keys(full).sort(), ['fetchedAt', 'windows'])
+  assert.deepEqual(await client.getUsage('tenant'), full)
+  assert.equal(calls, 1)
+
+  windows = { primary_window: { ...weekly, used_percent: 100 }, secondary_window: null }
+  const weeklyOnly = await client.getUsage('tenant', { force: true })
+  assert.deepEqual(weeklyOnly.windows, [{ durationSeconds: 604800, remainingPercent: 0, resetsAt: 1_800_000_000_000 }])
+  windows = { primary_window: { ...weekly, used_percent: null }, secondary_window: { used_percent: 5 } }
+  assert.deepEqual((await client.getUsage('tenant', { force: true })).windows, [])
+})
+
+test('a pending usage request cannot surface an earlier account after its cache is cleared', async () => {
+  const started = Promise.withResolvers()
+  const reply = Promise.withResolvers()
+  const { client } = fixture(async () => {
+    started.resolve()
+    return reply.promise
+  })
+  const pending = client.getUsage('tenant')
+  await started.promise
+  client.clearUsage()
+  reply.resolve(Response.json({ rate_limit: null }))
+  await assert.rejects(pending, { code: 'CODEX_ACCOUNT_MISMATCH' })
+})
+
 test('account catalog presents only unique visible slugs in account order', async () => {
   const { client } = fixture(async (url, { headers }) => {
     const upstream = new URL(url)

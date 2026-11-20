@@ -54,7 +54,14 @@ test('subscription IPC requires the trusted frame and opens only the active fixe
       start: async () => attempt,
       attempt: id => (id === attempt.attemptId ? attempt : null)
     }),
-    getClient: () => ({ listModels: async ref => [{ id: ref, label: 'visible' }] }),
+    getClient: () => ({
+      listModels: async ref => [{ id: ref, label: 'visible' }],
+      getUsage: async (ref, options) => {
+        assert.equal(ref, 'current-ref')
+        assert.deepEqual(options, { force: true })
+        return { windows: [], fetchedAt: 100 }
+      }
+    }),
     openExternal: async url => {
       opened.push(url)
     }
@@ -67,6 +74,8 @@ test('subscription IPC requires the trusted frame and opens only the active fixe
   assert.equal(await handlers.get('codex:open-verification')(trusted, 'current', 'https://example.invalid'), true)
   assert.deepEqual(opened, [CODEX_VERIFICATION_URL, CODEX_VERIFICATION_URL])
   assert.deepEqual(await handlers.get('codex:list-models')(trusted), [{ id: 'current-ref', label: 'visible' }])
+  await assert.rejects(handlers.get('codex:usage')({ sender: contents, senderFrame: { ...frame } }), /ChatGPT/)
+  assert.deepEqual(await handlers.get('codex:usage')(trusted, true), { windows: [], fetchedAt: 100 })
 })
 
 test('Express requires the launch token even with a local origin and Vite-style path', async t => {
