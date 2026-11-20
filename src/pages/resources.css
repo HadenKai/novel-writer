@@ -545,6 +545,190 @@
   padding: 16px;
 }
 
+.resources-scope .resources-station-identity {
+  display: flex;
+  align-items: center;
+  flex: 1 1 230px;
+  min-width: 0;
+}
+
+.resources-scope .resources-station-identity--usage {
+  flex: 1 1 400px;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.resources-scope .resources-station-identity--usage > .resources-station-toggle {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.resources-scope .resources-subscription-account {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  max-width: 100%;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.resources-scope
+  :is(
+    .resources-subscription-email,
+    .resources-subscription-plan,
+    .resources-subscription-usage-window,
+    .resources-subscription-usage-status
+  ) {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 38%, transparent);
+  border-radius: 999px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
+.resources-scope .resources-subscription-email {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  color: #24588f;
+}
+
+.dark .resources-scope .resources-subscription-email {
+  color: #91c2fb;
+}
+
+.resources-scope .resources-subscription-plan {
+  background: var(--gold-soft);
+  color: var(--gold);
+  white-space: nowrap;
+}
+
+.resources-scope .resources-subscription-usage {
+  position: relative;
+  max-width: 100%;
+  color: var(--text-dim);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.resources-scope .resources-subscription-usage-trigger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.resources-scope .resources-subscription-usage-status {
+  border-color: var(--line-soft);
+}
+
+.resources-scope .resources-subscription-usage-window {
+  --usage-tone: var(--jade);
+  gap: 6px;
+  border-color: color-mix(in srgb, var(--usage-tone) 38%, transparent);
+  background: color-mix(in srgb, var(--usage-tone) 13%, transparent);
+  color: color-mix(in srgb, var(--usage-tone) 80%, var(--text));
+  white-space: nowrap;
+}
+
+.resources-scope .resources-subscription-usage-window[data-tone='low'] {
+  --usage-tone: var(--amber);
+}
+
+.resources-scope .resources-subscription-usage-window[data-tone='critical'] {
+  --usage-tone: var(--seal);
+}
+
+.resources-scope
+  .resources-subscription-usage-trigger:is(:hover, [aria-expanded='true'])
+  > .resources-subscription-usage-window {
+  border-color: color-mix(in srgb, var(--usage-tone) 62%, transparent);
+}
+
+.resources-scope .resources-usage-meter {
+  width: 44px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-dim) 24%, var(--panel2));
+}
+
+.resources-scope .resources-usage-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--usage-tone);
+}
+
+.resources-scope .resources-subscription-usage-panel {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 190px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-md);
+  background: var(--panel2);
+  box-shadow: 0 8px 20px #0003;
+}
+
+.resources-scope .resources-subscription-usage-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.resources-scope .resources-subscription-usage-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.resources-scope .resources-subscription-usage-close:hover {
+  background: var(--panel);
+  color: var(--text);
+}
+
+.resources-scope .resources-subscription-usage-panel dl {
+  margin: 0 0 8px;
+}
+
+.resources-scope .resources-subscription-usage-panel dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  line-height: 1.8;
+}
+
+.resources-scope .resources-subscription-usage-panel dd {
+  margin: 0;
+  color: var(--text);
+  white-space: nowrap;
+}
+
 .resources-scope .resources-station-toggle {
   display: flex;
   align-items: center;

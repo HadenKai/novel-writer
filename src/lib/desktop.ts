@@ -4,7 +4,41 @@
  * 原先这个类型断言在 App / Home / Workspace / ReferenceAnalysisModal 里各写了一遍，
  * 有的写全有的只写 pickFolder。统一到这里，改一处即可。
  */
+export interface CodexConnectionStatus {
+  state: 'disconnected' | 'connected' | 'reconnect' | 'disconnect-error' | 'unavailable'
+  connectionRef?: string
+  label?: string
+  email?: string
+  code?: string
+}
+
+export interface CodexAttemptStatus {
+  attemptId: string
+  state: 'starting' | 'pending' | 'retrying' | 'connected' | 'cancelled' | 'expired' | 'error'
+  userCode?: string
+  expiresAt?: number
+  code?: string
+}
+
+export interface CodexUsageSnapshot {
+  windows: { durationSeconds: number; remainingPercent: number; resetsAt: number | null }[]
+  fetchedAt: number
+  planLabel?: string
+}
+
+export interface CodexDesktopAPI {
+  status: () => Promise<CodexConnectionStatus>
+  start: () => Promise<CodexAttemptStatus>
+  attempt: (id: string) => Promise<CodexAttemptStatus | null>
+  openVerification: (id: string) => Promise<boolean>
+  cancel: (id: string) => Promise<void>
+  disconnect: () => Promise<void>
+  listModels: () => Promise<{ id: string; label: string }[]>
+  getUsage: (force?: boolean) => Promise<CodexUsageSnapshot>
+}
+
 export interface DesktopAPI {
+  codex?: CodexDesktopAPI
   pickFolder?: () => Promise<string | null>
   winMinimize?: () => Promise<void>
   winMaximize?: () => Promise<boolean>

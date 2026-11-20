@@ -227,8 +227,10 @@ export interface ParsedSettings {
   extraRequirements: string
 }
 
-/** 模型服务供应商：openai 兼容接口 / 谷歌 Gemini 原生接口 */
-export type ModelProvider = 'openai' | 'gemini'
+export type ModelProvider = 'openai' | 'gemini' | 'chatgpt-subscription'
+export type ReasoningEffort = 'default' | 'low' | 'medium' | 'high' | 'xhigh' | 'max'
+export type CodexModelConnectionState =
+  'connected' | 'reconnect' | 'account-mismatch' | 'disconnect-error' | 'unavailable' | 'catalog-missing'
 
 export interface ModelConfig {
   id: string
@@ -240,11 +242,13 @@ export interface ModelConfig {
   model: string
   temperature: number
   isDefault: boolean
-  /** 接入协议：Gemini 原生 generateContent，其余为 OpenAI 兼容 chat/completions */
   provider?: ModelProvider
+  connectionRef?: string
+  connectionState?: CodexModelConnectionState
   /** Gemini 3.x 思考等级（openai 系忽略）：LOW / MEDIUM / HIGH */
   thinkingLevel?: 'LOW' | 'MEDIUM' | 'HIGH'
-  reasoningEffort?: 'default' | 'low' | 'medium' | 'high'
+  reasoningEffort?: ReasoningEffort
+  supportedReasoningEfforts?: Exclude<ReasoningEffort, 'default'>[]
   /** 本地部署（Ollama / LM Studio / llama.cpp …）：无需 API Key，请求按端点串行 */
   local?: boolean
   /** 本地模型的上下文窗口（token）。填 0/不填表示按云端默认预算裁剪提示词 */

@@ -17,6 +17,14 @@ function tailText(text, n = 700) {
 /** 方案与审稿共用的小预算：只带必要上下文，避免本地模型被长提示词拖慢 */
 const BRIEF_LIMIT = 12000
 
+function authorRequest(extraPrompt) {
+  return section(
+    '本次要求',
+    extraPrompt ? `【作者本次写作补充要求】（作为正文要求，当前阶段仍按规定格式输出）\n${extraPrompt}` : '',
+    { keep: true }
+  )
+}
+
 function outlineOf(novel, idx) {
   return (novel.outline || []).find(o => o.index === idx)
 }
@@ -66,6 +74,7 @@ export function chapterBriefMessages(novel, chapterIndex, opts = {}) {
     section('人物', castText(novel)),
     section('剧情线', plotlineText(novel)),
     section('本章大纲', cur ? `《${cur.title}》\n${cur.summary}` : '（没有本章大纲，按前文自然推进）', { keep: true }),
+    authorRequest(opts.extraPrompt),
     section('下一章', next ? `《${next.title}》\n${(next.summary || '').slice(0, 300)}` : '（暂无）'),
     // 作者关掉「关联前文」时，方案也不该读上一章，否则等于换个地方违反这个开关
     section(
@@ -103,6 +112,7 @@ export function chapterReviewMessages(novel, chapterIndex, draft, opts = {}) {
       '写作约束',
       `视角：${novel.pov === 'first' ? '第一人称' : '第三人称'}；目标字数约 ${novel.targetWords || 2000} 字；当前 ${countTextUnits(text)} 字。`
     ),
+    authorRequest(opts.extraPrompt),
     section('初稿', text, { keep: true }),
     section(
       '审查维度',
@@ -111,7 +121,7 @@ export function chapterReviewMessages(novel, chapterIndex, draft, opts = {}) {
 3. 连贯：与上一章的衔接、时间地点、道具与伤势是否自洽
 4. 节奏：是否有大段解释、无效对话、重复描写
 5. AI 腔：动作后补解读、堆砌修饰、整齐排比、空泛抒情
-6. 篇幅：是否明显偏离目标字数（低于 85% 或高于 115%）`,
+6. 作者本次要求：检查是否已落实。篇幅优先参考本次明确要求，否则检查是否低于默认目标的 85% 或高于 115%`,
       { keep: true }
     ),
     section(
@@ -150,6 +160,7 @@ export function chapterFixMessages(novel, chapterIndex, draft, issues, opts = {}
       `按审稿意见修改《${novel.title || '未命名'}》第 ${chapterIndex} 章。只改被指出的问题，其余段落尽量保持原样。`
     ),
     section('本章大纲', cur ? `《${cur.title}》\n${cur.summary}` : '（无）'),
+    authorRequest(opts.extraPrompt),
     section('审稿意见', list, { keep: true }),
     section('原稿', draft, { keep: true }),
     section(

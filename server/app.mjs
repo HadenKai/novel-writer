@@ -190,8 +190,7 @@ app.post('/api/ai/parse-settings', async (req, res) => {
   if (raw.length < 10) return res.status(400).json({ error: '设定内容太短，直接手动填更方便' })
 
   // 分拣可指定模型（前端透传）；未指定时用书的默认模型
-  const wantConn = resolveConn(req.body?.modelId)
-  const conn = wantConn || resolveConn(novel.modelId)
+  const conn = resolveConn(req.body?.modelId || novel.modelId)
   if (!conn) return res.status(400).json({ error: '还没有配置模型，请先到【模型设置】添加' })
 
   try {
@@ -899,6 +898,7 @@ app.post('/api/novels', (req, res) => {
 function upstreamFailHint(e) {
   const st = Number(e?.status)
   const raw = String(e?.message || e)
+  if (typeof e?.code === 'string' && e.code.startsWith('CODEX_')) return raw
   const head =
     st === 401
       ? '模型鉴权失败（401）：API Key 无效或已过期，请到「模型设置」重新粘贴'
@@ -1716,6 +1716,7 @@ async function runChapterJob(job) {
   // 写作 Agent：只有「整章重写」走四阶段（构思/起草/自检/修订）；
   // 续写/润色/改稿/降 AI 都是对既有正文的一次性变换，加方案与审稿只会更慢更贵。
   const agentMode = !!job.agent && kind === 'write'
+  const { extraPrompt } = job
 
   let messages
   let brief = null
@@ -1728,7 +1729,8 @@ async function runChapterJob(job) {
         conn,
         chapterBriefMessages(novel, idx, {
           limit: limit ? Math.min(limit, 12000) : 12000,
-          linkContext
+          linkContext,
+          extraPrompt
         }),
         2048
       )
@@ -1742,7 +1744,7 @@ async function runChapterJob(job) {
       if (job.stopRequested) throw e
       job.stageNote = '方案生成失败，直接起草'
     }
-    messages = chapterMessages(novel, idx, { linkContext, kbContext, brief, limit })
+    messages = chapterMessages(novel, idx, { linkContext, kbContext, brief, limit, extraPrompt })
   } else {
     messages =
       kind === 'continue'
@@ -1753,7 +1755,7 @@ async function runChapterJob(job) {
             ? reviseMessages(novel, idx, job.extraPrompt, { kbContext, limit })
             : kind === 'deai'
               ? dehumanizeMessages(novel, idx, job.extraPrompt, { limit })
-              : chapterMessages(novel, idx, { linkContext, kbContext, limit })
+              : chapterMessages(novel, idx, { linkContext, kbContext, limit, extraPrompt })
   }
 
   let full = ''
@@ -1822,7 +1824,7 @@ async function runChapterJob(job) {
         const reviewRaw = await collectOnce(
           job,
           conn,
-          chapterReviewMessages(novel, idx, draftText, { limit: limit ? Math.min(limit, 30000) : 30000 }),
+          chapterReviewMessages(novel, idx, draftText, { limit: limit ? Math.min(limit, 30000) : 30000, extraPrompt }),
           2048
         )
         const report = extractJsonObject(reviewRaw) || null
@@ -1835,7 +1837,10 @@ async function runChapterJob(job) {
           const fixed = await streamInto(
             job,
             conn,
-            chapterFixMessages(novel, idx, draftText, issues, { limit: limit ? Math.min(limit, 45000) : 45000 }),
+            chapterFixMessages(novel, idx, draftText, issues, {
+              limit: limit ? Math.min(limit, 45000) : 45000,
+              extraPrompt
+            }),
             chapterMaxTokens(novel, kind)
           )
           const fixedText = cleanChapter(fixed.full)

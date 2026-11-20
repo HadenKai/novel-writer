@@ -6,7 +6,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { normalizeOpenAIBase } from './ai.mjs'
+import { normalizeOpenAIBase, streamChat } from './ai.mjs'
+import { CODEX_PROVIDER, CODEX_REASONING_EFFORTS, getCodexClient } from './codex-responses.mjs'
+import { codexError } from './codex-oauth.mjs'
 import { probeLocalEndpoint, scanLocalEndpoints } from './local-models.mjs'
 import {
   AUTHOR_STYLES,
@@ -69,6 +71,10 @@ function revealApiKey(value) {
 }
 
 // ---------- 多模型管理 ----------
+const CODEX_STATION_NAME = 'ChatGPT Subscription'
+const CATALOG_REFRESH_INTERVAL = 5 * 60_000
+const CATALOG_RETRY_INTERVAL = 30_000
+let catalogSync
 // 用户给中转站自定义的名字（不改 models.json 结构，独立文件互不影响）
 function readStationNames() {
   const o = readJson(STATION_NAMES_FILE, {})
@@ -91,15 +97,38 @@ function stationKey(m) {
 export function normalizeModel(m) {
   const provider = m.provider === 'gemini' ? 'gemini' : 'openai'
   const thinkingLevel = ['LOW', 'MEDIUM', 'HIGH'].includes(m.thinkingLevel) ? m.thinkingLevel : 'MEDIUM'
-  const reasoningEffort = ['default', 'low', 'medium', 'high'].includes(m.reasoningEffort)
-    ? m.reasoningEffort
-    : 'default'
+  const efforts = m.provider === CODEX_PROVIDER ? CODEX_REASONING_EFFORTS : ['low', 'medium', 'high']
+  const reasoningEffort = efforts.includes(m.reasoningEffort) ? m.reasoningEffort : 'default'
+  if (m.provider === CODEX_PROVIDER) {
+    const connectionRef =
+      typeof m.connectionRef === 'string' && /^[a-f0-9]{64}$/.test(m.connectionRef) ? m.connectionRef : ''
+    return {
+      id: m.id,
+      name: String(m.name || '').trim(),
+      model: String(m.model || '').trim(),
+      isDefault: !!m.isDefault,
+      baseUrl: '',
+      apiKey: '',
+      temperature: 0.8,
+      provider: CODEX_PROVIDER,
+      local: false,
+      contextTokens: 0,
+      reasoningEffort,
+      supportedReasoningEfforts: Array.isArray(m.supportedReasoningEfforts)
+        ? CODEX_REASONING_EFFORTS.filter(effort => m.supportedReasoningEfforts.includes(effort))
+        : undefined,
+      connectionRef,
+      ...(m.catalogDeleted === true && { catalogDeleted: true }),
+      ...(m.catalogMissing === true && { catalogMissing: true })
+    }
+  }
   const base = String(m.baseUrl || '').trim()
   const local = !!m.local && provider === 'openai'
   const rawCtx = Number(m.contextTokens)
   const contextTokens = Number.isFinite(rawCtx) && rawCtx >= 2048 ? Math.min(Math.floor(rawCtx), 1_048_576) : 0
   return {
-    ...m,
+    id: m.id,
+    isDefault: !!m.isDefault,
     name: String(m.name || '').trim(),
     baseUrl: provider === 'gemini' ? base : normalizeOpenAIBase(base),
     apiKey: revealApiKey(m.apiKey),
@@ -116,22 +145,106 @@ export function normalizeModel(m) {
 export function listModels() {
   const arr = readJson(MODELS_FILE, [])
   const names = readStationNames()
-  return (Array.isArray(arr) ? arr : []).map(m => {
-    const n = normalizeModel(m)
-    return { ...n, stationName: names[stationKey(n)] || '' }
-  })
+  return (Array.isArray(arr) ? arr : [])
+    .map(normalizeModel)
+    .filter(m => !m.catalogDeleted)
+    .map(m => ({
+      ...m,
+      stationName: m.provider === CODEX_PROVIDER ? CODEX_STATION_NAME : names[stationKey(m)] || ''
+    }))
 }
 
 // 对外展示时掩码密钥，避免明文外泄
 export function maskModel(m) {
   const k = m.apiKey || ''
   const masked = k.length >= 8 ? `${k.slice(0, 3)}****${k.slice(-4)}` : k ? '****' : ''
-  return { ...m, apiKey: masked, hasKey: !!k }
+  const {
+    id,
+    name,
+    model,
+    baseUrl,
+    temperature,
+    provider,
+    local,
+    isDefault,
+    contextTokens,
+    thinkingLevel,
+    reasoningEffort,
+    stationName
+  } = m
+  const publicModel = {
+    id,
+    name,
+    model,
+    baseUrl,
+    temperature,
+    provider,
+    local,
+    isDefault,
+    contextTokens,
+    thinkingLevel,
+    reasoningEffort,
+    stationName: stationName || '',
+    apiKey: masked,
+    hasKey: !!k
+  }
+  if (provider !== CODEX_PROVIDER) return publicModel
+  const status = getCodexClient()?.status()
+  const connectionState =
+    !status || status.state === 'unavailable'
+      ? 'unavailable'
+      : status.state === 'disconnect-error'
+        ? 'disconnect-error'
+        : status.state !== 'connected'
+          ? 'reconnect'
+          : status.connectionRef !== m.connectionRef
+            ? 'account-mismatch'
+            : m.catalogMissing
+              ? 'catalog-missing'
+              : 'connected'
+  return {
+    ...publicModel,
+    stationName: CODEX_STATION_NAME,
+    connectionRef: m.connectionRef,
+    supportedReasoningEfforts: m.supportedReasoningEfforts,
+    connectionState
+  }
 }
 
 export function validModel(m) {
   // 本地模型允许空密钥：要求填 Key 会把绝大多数本机推理服务挡在门外
+  if (m?.provider === CODEX_PROVIDER) return Boolean(m.name && m.model && m.connectionRef)
   return !!(m && m.name && m.baseUrl && m.model && (m.apiKey || m.local))
+}
+
+function validateModelBinding(model, previous) {
+  if (
+    model.provider !== CODEX_PROVIDER ||
+    (previous?.provider === CODEX_PROVIDER && previous.connectionRef === model.connectionRef)
+  )
+    return
+  const status = getCodexClient()?.status()
+  if (!status || status.state === 'unavailable') throw codexError('CODEX_UNAVAILABLE')
+  if (status.state !== 'connected') throw codexError(status.code || 'CODEX_RECONNECT')
+  if (status.connectionRef !== model.connectionRef) throw codexError('CODEX_ACCOUNT_MISMATCH')
+}
+
+function subscriptionRouteError(res, error) {
+  const issue = codexError(String(error?.code || 'CODEX_INVALID_RESPONSE'))
+  return res.status(400).json({ error: issue.message, code: issue.code })
+}
+
+function subscriptionCatalogOnly(res) {
+  return res.status(400).json({ error: '请从 ChatGPT Subscription 的账号连接中选择模型。' })
+}
+
+function validationError(res, model) {
+  return res.status(400).json({
+    error:
+      model?.provider === CODEX_PROVIDER
+        ? '请填写名称、模型 ID 并绑定一个 ChatGPT 账号。'
+        : '名称、地址、模型名不能为空（非本地部署还需 API Key）'
+  })
 }
 
 /**
@@ -145,11 +258,124 @@ async function mutateModels(fn) {
     MODELS_FILE,
     raw => {
       const list = (Array.isArray(raw) ? raw : []).map(normalizeModel)
-      const out = fn(list) || list
-      return out.map(x => ({ ...x, apiKey: protectApiKey(x.apiKey) }))
+      const out = fn(list)
+      return out === null ? null : (out || list).map(x => ({ ...x, apiKey: protectApiKey(x.apiKey) }))
     },
     []
   )
+}
+
+function connectedCatalogRef(client) {
+  const status = client?.status()
+  if (!status || status.state === 'unavailable') throw codexError('CODEX_UNAVAILABLE')
+  if (status.state !== 'connected') throw codexError(status.code || 'CODEX_RECONNECT')
+  return status.connectionRef
+}
+
+async function syncSubscriptionModels({ force = false } = {}) {
+  const client = getCodexClient()
+  const ref = connectedCatalogRef(client)
+  if (catalogSync?.client !== client || catalogSync.ref !== ref) {
+    catalogSync = { client, ref, nextAt: 0 }
+  }
+  const sync = catalogSync
+  if (sync.pending) return sync.pending
+  if (!force && Date.now() < sync.nextAt) return sync.count
+
+  const checkBinding = () => {
+    if (getCodexClient() !== client || catalogSync !== sync || connectedCatalogRef(client) !== ref)
+      throw codexError('CODEX_ACCOUNT_MISMATCH')
+  }
+  sync.pending = (async () => {
+    const remote = await client.listModels(ref)
+    checkBinding()
+    if (!remote.length) return 0
+    await mutateModels(list => {
+      checkBinding()
+      const bound = list.filter(m => m.provider === CODEX_PROVIDER && m.connectionRef === ref)
+      const upstream = new Map(remote.map(model => [model.id, model]))
+      let changed = false
+      for (const saved of bound) {
+        if (saved.catalogDeleted) continue
+        const model = upstream.get(saved.model)
+        const efforts = model?.reasoningEfforts
+        if (!model && !saved.supportedReasoningEfforts) continue
+        const missing = !model
+        const nextEfforts = efforts || []
+        if (
+          missing === Boolean(saved.catalogMissing) &&
+          nextEfforts.join(',') === saved.supportedReasoningEfforts?.join(',')
+        )
+          continue
+        saved.supportedReasoningEfforts = nextEfforts
+        saved.catalogMissing = missing
+        changed = true
+      }
+      const known = new Set(bound.map(m => m.model))
+      for (const model of remote) {
+        if (known.has(model.id)) continue
+        changed = true
+        list.push(
+          normalizeModel({
+            id: crypto.randomUUID(),
+            provider: CODEX_PROVIDER,
+            connectionRef: ref,
+            name: model.label,
+            model: model.id,
+            supportedReasoningEfforts: model.reasoningEfforts
+          })
+        )
+      }
+      return changed ? list : null
+    })
+    return remote.length
+  })()
+  try {
+    sync.count = await sync.pending
+    sync.nextAt = Date.now() + (sync.count ? CATALOG_REFRESH_INTERVAL : CATALOG_RETRY_INTERVAL)
+    return sync.count
+  } catch (error) {
+    sync.nextAt = Date.now() + CATALOG_RETRY_INTERVAL
+    throw error
+  } finally {
+    sync.pending = null
+  }
+}
+
+async function restoreSubscriptionModels(connectionRef) {
+  const client = getCodexClient()
+  const ref = connectedCatalogRef(client)
+  if (ref !== connectionRef) throw codexError('CODEX_ACCOUNT_MISMATCH')
+  const upstream = new Map((await client.listModels(ref)).map(model => [model.id, model]))
+  let count = 0
+  await mutateModels(list => {
+    if (getCodexClient() !== client || connectedCatalogRef(client) !== ref) throw codexError('CODEX_ACCOUNT_MISMATCH')
+    for (const saved of list) {
+      if (saved.provider !== CODEX_PROVIDER || saved.connectionRef !== ref || !saved.catalogDeleted) continue
+      const model = upstream.get(saved.model)
+      if (!model) continue
+      delete saved.catalogDeleted
+      delete saved.catalogMissing
+      saved.supportedReasoningEfforts = model.reasoningEfforts
+      count++
+    }
+    return count ? list : null
+  })
+  return count
+}
+
+async function deleteModels(idSet) {
+  await mutateModels(list =>
+    list.filter(model => {
+      if (!idSet.has(model.id)) return true
+      if (model.provider !== CODEX_PROVIDER) return false
+      // Remember explicit removals so subsequent catalog syncs respect them.
+      model.catalogDeleted = true
+      model.isDefault = false
+      return true
+    })
+  )
+  await detachNovelsFromModels(idSet)
 }
 
 /** 删除/变更模型后，把引用它的作品回落到默认模型，避免静默降级。
@@ -187,9 +413,13 @@ export function resolveConn(modelId) {
     list.find(x => String(x.name || '').trim() === key) ||
     list.find(x => x.isDefault) ||
     list[0]
-  if (!m) return null
+  return m ? modelConnection(m) : null
+}
+
+function modelConnection(m) {
   return {
     id: m.id,
+    ...(m.provider === CODEX_PROVIDER && { connectionRef: m.connectionRef }),
     baseUrl: m.baseUrl,
     apiKey: m.apiKey,
     model: m.model,
@@ -203,13 +433,49 @@ export function resolveConn(modelId) {
 }
 
 export function registerModelRoutes(app) {
-  app.get('/api/models', (_req, res) => {
-    res.json(listModels().map(maskModel))
+  app.get('/api/models', async (_req, res) => {
+    const status = getCodexClient()?.status()
+    let models = listModels()
+    if (status?.state === 'connected') {
+      const sync = syncSubscriptionModels().catch(() => {})
+      if (!models.some(m => m.connectionRef === status.connectionRef && m.supportedReasoningEfforts)) {
+        await sync
+        models = listModels()
+      }
+    } else catalogSync = undefined
+    res.json(models.map(maskModel))
+  })
+
+  app.post('/api/models/subscription/sync', async (_req, res) => {
+    try {
+      res.json({ count: await syncSubscriptionModels({ force: true }) })
+    } catch (error) {
+      return subscriptionRouteError(res, error)
+    }
+  })
+
+  app.post('/api/models/subscription/restore', async (req, res) => {
+    try {
+      res.json({ count: await restoreSubscriptionModels(req.body?.connectionRef) })
+    } catch (error) {
+      return subscriptionRouteError(res, error)
+    }
   })
 
   app.post('/api/models', async (req, res) => {
-    const m = normalizeModel({ ...req.body, id: req.body?.id || crypto.randomUUID() })
-    if (!validModel(m)) return res.status(400).json({ error: '名称、地址、模型名不能为空（非本地部署还需 API Key）' })
+    const m = normalizeModel({
+      ...req.body,
+      id: req.body?.id || crypto.randomUUID(),
+      supportedReasoningEfforts: undefined,
+      catalogDeleted: undefined,
+      catalogMissing: undefined
+    })
+    if (!validModel(m)) return validationError(res, m)
+    try {
+      validateModelBinding(m)
+    } catch (error) {
+      return subscriptionRouteError(res, error)
+    }
     let dup = false
     await mutateModels(list => {
       // 同 id 两条会让 PUT 只改第一条、DELETE 删全部、resolveConn 永远命中第一条
@@ -227,18 +493,43 @@ export function registerModelRoutes(app) {
   app.put('/api/models/:id', async (req, res) => {
     let status = 200
     let payload = null
+    let bindingError = null
     await mutateModels(list => {
       const i = list.findIndex(x => x.id === req.params.id)
-      if (i < 0) {
+      const previous = list[i]
+      if (!previous || previous.catalogDeleted) {
         status = 404
         return
       }
-      const incoming = { ...req.body, id: req.params.id }
+      const incoming = {
+        ...req.body,
+        id: req.params.id,
+        supportedReasoningEfforts: undefined,
+        catalogDeleted: undefined,
+        catalogMissing: undefined
+      }
+      if (incoming.provider === CODEX_PROVIDER) {
+        if (incoming.connectionRef === undefined) incoming.connectionRef = previous.connectionRef
+        if (
+          incoming.connectionRef === previous.connectionRef &&
+          String(incoming.model || '').trim() === previous.model
+        ) {
+          incoming.supportedReasoningEfforts = previous.supportedReasoningEfforts
+          incoming.catalogMissing = previous.catalogMissing
+        }
+      }
       // 前端拿到的是掩码密钥；未修改时沿用原密钥
       if (!incoming.apiKey || /\*\*\*\*/.test(incoming.apiKey)) incoming.apiKey = list[i].apiKey
       const m = normalizeModel(incoming)
       if (!validModel(m)) {
         status = 400
+        payload = m
+        return
+      }
+      try {
+        validateModelBinding(m, list[i])
+      } catch (error) {
+        bindingError = error
         return
       }
       if (m.isDefault)
@@ -250,13 +541,13 @@ export function registerModelRoutes(app) {
       return list
     })
     if (status === 404) return res.status(404).json({ error: '模型不存在' })
-    if (status === 400) return res.status(400).json({ error: '名称、地址、模型名不能为空（非本地部署还需 API Key）' })
+    if (status === 400) return validationError(res, payload)
+    if (bindingError) return subscriptionRouteError(res, bindingError)
     res.json(payload)
   })
 
   app.delete('/api/models/:id', async (req, res) => {
-    await mutateModels(list => list.filter(x => x.id !== req.params.id))
-    await detachNovelsFromModels(new Set([req.params.id]))
+    await deleteModels(new Set([req.params.id]))
     res.json({ ok: true })
   })
 
@@ -264,14 +555,13 @@ export function registerModelRoutes(app) {
   app.delete('/api/models', async (req, res) => {
     const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String).filter(Boolean) : []
     if (!ids.length) return res.status(400).json({ error: '请选择要删除的模型' })
-    const idSet = new Set(ids)
-    await mutateModels(list => list.filter(x => !idSet.has(x.id)))
-    await detachNovelsFromModels(idSet)
+    await deleteModels(new Set(ids))
     res.json({ ok: true, deleted: ids.length })
   })
 
   // 探测某个地址+密钥可用的模型名（不落盘）
   app.post('/api/models/probe', async (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const provider = req.body?.provider === 'gemini' ? 'gemini' : 'openai'
     const baseRaw = String(req.body?.baseUrl || '').trim()
     const baseUrl = provider === 'gemini' ? baseRaw : normalizeOpenAIBase(baseRaw)
@@ -317,6 +607,7 @@ export function registerModelRoutes(app) {
 
   // 把扫描结果里的模型批量加入连接（缺省模型自动设为默认）
   app.post('/api/models/local/add', async (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const baseUrl = normalizeOpenAIBase(String(req.body?.baseUrl || '').trim())
     const names = Array.isArray(req.body?.models)
       ? req.body.models
@@ -363,6 +654,7 @@ export function registerModelRoutes(app) {
 
   // 给中转站起名 / 清空名字（清空后前端回落显示域名）
   app.post('/api/models/stations/name', (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const provider = req.body?.provider === 'gemini' ? 'gemini' : 'openai'
     const baseUrl = String(req.body?.baseUrl || '')
       .trim()
@@ -380,6 +672,7 @@ export function registerModelRoutes(app) {
   })
 
   app.post('/api/models/import', async (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const provider = req.body?.provider === 'gemini' ? 'gemini' : 'openai'
     const rawBaseUrl = String(req.body?.baseUrl || '').trim()
     const baseUrl = provider === 'gemini' ? rawBaseUrl.replace(/\/+$/, '') : normalizeOpenAIBase(rawBaseUrl)
@@ -436,12 +729,15 @@ export function registerModelRoutes(app) {
 
   // 一键导入「此站新模型」：复用该站已有密钥，只补齐未收录的模型名，重复跳过
   app.post('/api/models/import-group', async (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const baseUrl = String(req.body?.baseUrl || '')
       .trim()
       .replace(/\/+$/, '')
     if (!baseUrl) return res.status(400).json({ error: '地址不合法' })
     const list = listModels()
-    const siblings = list.filter(m => (m.baseUrl || '').replace(/\/+$/, '') === baseUrl)
+    const siblings = list.filter(
+      m => m.provider !== CODEX_PROVIDER && (m.baseUrl || '').replace(/\/+$/, '') === baseUrl
+    )
     if (!siblings.length) return res.status(400).json({ error: '这个地址还没有模型，请先手动添加一个' })
     const tpl = siblings[0] // 复用同站第一个模型的密钥与 provider
     try {
@@ -498,20 +794,12 @@ export function registerModelRoutes(app) {
   app.post('/api/models/:id/test', async (req, res) => {
     const m = listModels().find(x => x.id === req.params.id)
     if (!m) return res.status(404).json({ error: '模型不存在' })
-    const conn = {
-      id: m.id,
-      baseUrl: m.baseUrl,
-      apiKey: m.apiKey,
-      model: m.model,
-      temperature: m.temperature,
-      provider: m.provider,
-      thinkingLevel: m.thinkingLevel,
-      reasoningEffort: m.reasoningEffort
-    }
+    const conn = modelConnection(m)
     try {
-      const out = await probeChat(conn)
+      const out = conn.provider === CODEX_PROVIDER ? await probeSubscription(conn) : await probeChat(conn)
       res.json({ ok: true, reply: out })
     } catch (e) {
+      if (conn.provider === CODEX_PROVIDER) return subscriptionRouteError(res, e)
       res.status(400).json({ error: String(e.message || e) })
     }
   })
@@ -521,6 +809,7 @@ export function registerModelRoutes(app) {
     const list = listModels()
     const m = list.find(x => x.id === req.params.id)
     if (!m) return res.status(404).json({ error: '模型不存在' })
+    if (m.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     try {
       const headers = m.provider === 'gemini' ? { 'x-goog-api-key': m.apiKey } : { Authorization: `Bearer ${m.apiKey}` }
       const r = await fetch(`${m.baseUrl}/models`, { headers, signal: AbortSignal.timeout(20000) })
@@ -537,6 +826,24 @@ export function registerModelRoutes(app) {
       res.status(400).json({ error: String(e.message || e) })
     }
   })
+}
+
+async function probeSubscription(conn) {
+  let reply = ''
+  const messages = [
+    { role: 'system', content: '这是一条连接测试，回答一个短句。' },
+    { role: 'user', content: '请回复你好。' }
+  ]
+  try {
+    for await (const event of streamChat(conn, { messages, signal: AbortSignal.timeout(60_000) })) {
+      if (event.type === 'content') reply = (reply + event.text).slice(0, 80)
+    }
+  } catch (error) {
+    if (error.name === 'TimeoutError') throw codexError('CODEX_NETWORK')
+    throw error
+  }
+  if (!reply.trim()) throw codexError('CODEX_INVALID_RESPONSE')
+  return reply
 }
 
 /** 发一次极小的对话请求，验证密钥/地址可用 */

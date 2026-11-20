@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProp
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
+import { codexModelStateLabel } from '../lib/errors'
 import { broadcastModelUpdate, thinkingLabelOf, thinkingSteps, thinkingValue, withThinking } from '../lib/thinking'
 import { toast } from './Toast'
 import type { ModelConfig } from '../types'
@@ -26,7 +27,7 @@ export function groupOfModels(models: ModelConfig[]) {
     { key: string; provider: string; baseUrl: string; label: string; models: ModelConfig[] }
   >()
   for (const m of models) {
-    const provider = m.provider === 'gemini' ? 'gemini' : 'openai'
+    const provider = m.provider || 'openai'
     const base = (m.baseUrl || '').replace(/\/+$/, '')
     const key = `${provider}||${base}`
     if (!map.has(key)) {
@@ -34,7 +35,7 @@ export function groupOfModels(models: ModelConfig[]) {
         key,
         provider,
         baseUrl: base,
-        label: m.stationName || hostOf(base),
+        label: provider === 'chatgpt-subscription' ? 'ChatGPT Subscription' : m.stationName || hostOf(base),
         models: []
       })
     }
@@ -70,6 +71,7 @@ function stationLabels(groups: StationGroup[]) {
 
 /** 中转站的类型徽标：只用模型配置里真实存在的信息，不臆造能力标签 */
 function stationBadge(g: StationGroup): { text: string; tone: 'gemini' | 'local' | 'api' } {
+  if (g.provider === 'chatgpt-subscription') return { text: '订阅', tone: 'api' }
   if (g.provider === 'gemini') return { text: 'Gemini', tone: 'gemini' }
   if (g.models.length && g.models.every(m => m.local)) return { text: '本地', tone: 'local' }
   return { text: 'API', tone: 'api' }
@@ -552,6 +554,9 @@ export default function ModelSelect({
                     <span className="mp-model-main">
                       <span className="mp-model-name">{m.name}</span>
                       {m.model && m.model !== m.name && <span className="mp-model-id">{m.model}</span>}
+                      {codexModelStateLabel(m.connectionState) && (
+                        <span className="mp-model-id">{codexModelStateLabel(m.connectionState)}</span>
+                      )}
                     </span>
                     <span className="mp-model-badges">
                       {m.isDefault && <span className="mp-badge mp-badge--gold">默认</span>}

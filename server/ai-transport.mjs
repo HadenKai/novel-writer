@@ -12,6 +12,9 @@
 //  - 首字节到达后块间隔 120s：此后卡住基本都是链路问题，可安全自愈
 //  - 仅当「尚未产出任何内容」时才重试，已开始输出后失败直接上报，避免正文重复
 
+import { CODEX_PROVIDER, getCodexClient } from './codex-responses.mjs'
+import { codexError } from './codex-oauth.mjs'
+
 const CONNECT_TIMEOUT_MS = 30000 // 连接建立超时（含收到响应头）
 const CHUNK_TIMEOUT_MS = 120000 // 相邻数据块最大间隔（模型思考慢时不中断）
 const RETRIES = 2 // 整体失败重试次数
@@ -720,6 +723,12 @@ export async function* streamChat(connOrOpts, maybeOpts) {
   // 漏合并会导致 messages 落到第二个被忽略的参数上、JSON 序列化时整键丢失，
   // 上游直接回 400「messages are required」。
   const opts = maybeOpts ? { ...connOrOpts, ...maybeOpts } : connOrOpts
+  if (opts?.provider === CODEX_PROVIDER) {
+    const client = getCodexClient()
+    if (!client) throw codexError('CODEX_UNAVAILABLE')
+    yield* client.stream(opts)
+    return
+  }
   if (opts?.provider === 'gemini') {
     yield* streamGemini(opts)
     return

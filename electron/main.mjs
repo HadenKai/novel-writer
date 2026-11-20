@@ -1,8 +1,12 @@
-import { app, BrowserWindow, shell, dialog, session, ipcMain, screen } from 'electron'
+import { app, BrowserWindow, shell, dialog, session, ipcMain, screen, safeStorage } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
+import { createCodexCredentialStorage } from './codex-credentials.mjs'
+import { desktopApiHeaders, registerCodexIpc } from './codex-ipc.mjs'
+import { createCodexAuth } from '../server/codex-oauth.mjs'
+import { configureCodexClient, createCodexClient, getCodexClient } from '../server/codex-responses.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const DEV_URL_RE = /^https?:\/\/(127\.0\.0\.1|localhost):5173(?:\/|$)/i
@@ -42,15 +46,13 @@ if (!app.requestSingleInstanceLock()) {
 // 所以这里用动态 import，先设环境变量再加载后端
 process.env.NOVEL_DATA_DIR = process.env.NOVEL_DATA_DIR || path.join(app.getPath('userData'), 'novel-data')
 
-// 生产窗口使用一次性访问令牌，阻止其它本地网页直接调用 API。
-// 开发窗口的 API 请求先经过 Vite 代理；代理不会转发 Electron 请求头，
-// 因此开发模式必须让后端按无令牌调试模式运行。
-const ACCESS_TOKEN = isDev ? '' : crypto.randomBytes(24).toString('hex')
-if (isDev) delete process.env.NOVEL_ACCESS_TOKEN
-else process.env.NOVEL_ACCESS_TOKEN = ACCESS_TOKEN
+// Electron 的可信窗口使用一次性令牌。开发模式的 Vite 代理原样转发该头。
+const ACCESS_TOKEN = crypto.randomBytes(24).toString('hex')
+process.env.NOVEL_ACCESS_TOKEN = ACCESS_TOKEN
 
 let win = null
 let trustedOrigin = ''
+let codexAuth = null
 let downloadHandlerRegistered = false
 // 后端「停止全部任务」句柄：关窗时用它掐断仍在跑的生成任务
 let stopAllJobs = null
@@ -130,6 +132,17 @@ function persistWinState(w) {
 }
 
 async function createWindow() {
+  if (!codexAuth) {
+    const storage = createCodexCredentialStorage({
+      filePath: path.join(process.env.NOVEL_DATA_DIR, 'codex-credentials.enc'),
+      safeStorage
+    })
+    // OAuth and Responses follow the desktop's configured proxy, with an isolated session.
+    const codexNetwork = session.fromPartition('novel-codex-network')
+    const fetchImpl = (url, options) => codexNetwork.fetch(url, { ...options, credentials: 'omit' })
+    codexAuth = await createCodexAuth({ storage, fetchImpl })
+    configureCodexClient(createCodexClient({ auth: codexAuth, fetchImpl, appVersion: app.getVersion() }))
+  }
   const { startServer, abortAllJobs, drainJobs } = await import('../server/app.mjs')
   stopAllJobs = abortAllJobs
   drainAllJobs = drainJobs
@@ -137,7 +150,7 @@ async function createWindow() {
   // 因此 Electron 开发模式也必须在端口被占用时直接报错。
   const port = await startServer(3789, { strictPort: true })
   const apiOrigin = `http://127.0.0.1:${port}`
-  trustedOrigin = isDev ? 'http://localhost:5173' : apiOrigin
+  trustedOrigin = isDev ? new URL(process.env.ELECTRON_START_URL).origin : apiOrigin
 
   const saved = loadWinState()
   win = new BrowserWindow({
@@ -165,13 +178,9 @@ async function createWindow() {
   if (saved?.maximized) win.maximize()
   for (const ev of ['resize', 'move', 'maximize', 'unmaximize']) win.on(ev, () => persistWinState(win))
 
-  // 生产窗口的 /api 请求自动附加令牌（渲染进程无需感知）。
-  // 开发模式使用 Vite 代理，代理目标不会保留这里的窗口请求头，因此不注册拦截器。
-  if (!isDev) {
-    session.defaultSession.webRequest.onBeforeSendHeaders({ urls: [`${apiOrigin}/api/*`] }, (details, cb) => {
-      cb({ requestHeaders: { ...details.requestHeaders, 'x-novel-token': ACCESS_TOKEN } })
-    })
-  }
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: [`${trustedOrigin}/api/*`] }, (details, cb) => {
+    cb({ requestHeaders: desktopApiHeaders(details, win?.webContents, trustedOrigin, ACCESS_TOKEN) })
+  })
 
   // CSP 兜底（响应头版）：与 index.html 的 meta 策略保持一致。
   // 生产环境收紧到 'self'；开发环境放开以便 Vite HMR 的 eval / websocket 能工作。
@@ -235,6 +244,15 @@ function trustedIpc(event) {
   return url.startsWith(trustedOrigin + '/') || url === trustedOrigin
 }
 
+registerCodexIpc({
+  ipcMain,
+  getWindow: () => win,
+  getOrigin: () => trustedOrigin,
+  getAuth: () => codexAuth,
+  getClient: getCodexClient,
+  openExternal: url => shell.openExternal(url)
+})
+
 ipcMain.handle('pick-folder', async event => {
   if (!trustedIpc(event)) return null
   const result = await dialog.showOpenDialog(win || undefined, {
@@ -275,6 +293,7 @@ app
   })
 
 app.on('window-all-closed', async () => {
+  const authClosed = codexAuth?.shutdown()
   // 关窗即「停止写作」：把仍在跑的后台任务全部掐断，避免进程退出时
   // 还挂着未完成的上游请求，也避免半截结果留在内存里没落盘。
   if (stopAllJobs) {
@@ -293,6 +312,8 @@ app.on('window-all-closed', async () => {
       /* 宽限失败不阻塞退出 */
     }
   }
+  // 等待已进入加密存储队列的操作结束。
+  await authClosed
   app.quit()
 })
 
