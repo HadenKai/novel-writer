@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import type { CodexDesktopAPI, CodexUsageSnapshot } from '../lib/desktop'
 
+const USAGE_REFRESH_MS = 40_000
 const percent = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 })
 const resetTime = new Intl.DateTimeFormat('zh-CN', {
   month: 'numeric',
@@ -24,16 +25,21 @@ export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
 
   useEffect(() => {
     let active = true
-    void codex.getUsage(refresh > 0).then(
-      usage => {
-        if (active) setSnapshot(usage)
-      },
-      () => {
-        if (active) setSnapshot(null)
-      }
-    )
+    function loadUsage(force: boolean) {
+      void codex.getUsage(force).then(
+        usage => {
+          if (active) setSnapshot(usage)
+        },
+        () => {
+          if (active) setSnapshot(null)
+        }
+      )
+    }
+    loadUsage(refresh > 0)
+    const usageTimer = window.setInterval(() => loadUsage(true), USAGE_REFRESH_MS)
     return () => {
       active = false
+      window.clearInterval(usageTimer)
     }
   }, [codex, refresh])
 
