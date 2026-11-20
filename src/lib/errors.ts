@@ -53,6 +53,7 @@ export function codexModelStateLabel(state?: CodexModelConnectionState): string 
   if (state === 'disconnect-error') return '断开未完成'
   if (state === 'account-mismatch') return '账号不匹配'
   if (state === 'unavailable') return '当前环境不可用'
+  if (state === 'catalog-missing') return '已从上游目录移除'
   return ''
 }
 

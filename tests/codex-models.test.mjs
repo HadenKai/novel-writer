@@ -22,6 +22,9 @@ test(
     let state = { state: 'connected', connectionRef: ref }
     let outcome = 'probe'
     const modelsHit = []
+    let catalog = []
+    let catalogCalls = 0
+    let pauseCatalog
     configureCodexClient(
       createCodexClient({
         auth: {
@@ -33,6 +36,12 @@ test(
           }
         },
         fetchImpl: async (url, options) => {
+          if (url.includes('/codex/models?')) {
+            catalogCalls++
+            const currentCatalog = catalog
+            await pauseCatalog?.promise
+            return currentCatalog ? Response.json({ models: currentCatalog }) : Response.json({}, { status: 503 })
+          }
           assert.equal(url, 'https://chatgpt.com/backend-api/codex/responses')
           const body = JSON.parse(options.body)
           modelsHit.push(body.model)
@@ -160,6 +169,79 @@ test(
         )
       }
       assert.deepEqual(modelsHit, ['cla-test'])
+    })
+
+    await t.test('the model list syncs account models and preserves ids, defaults and saved effort', async () => {
+      state = { state: 'connected', connectionRef: ref }
+      catalog = [
+        { slug: 'cla-test', display_name: 'Upstream name', supported_reasoning_levels: [{ effort: 'xhigh' }] },
+        { slug: 'new-upstream', display_name: 'New upstream', supported_reasoning_levels: [{ effort: 'max' }] }
+      ]
+      await fs.writeFile(
+        path.join(dir, 'station-names.json'),
+        JSON.stringify({ 'chatgpt-subscription||': 'Old alias' })
+      )
+      // Simulate a newly activated connection and a renderer listing models before its first explicit refresh.
+      state = { state: 'disconnected' }
+      await req('/api/models')
+      state = { state: 'connected', connectionRef: ref }
+      const list = async () => (await (await req('/api/models')).json()).filter(m => m.provider === provider)
+      const initial = await list()
+      const existing = initial.find(m => m.id === 'codex-a')
+      const added = initial.find(m => m.model === 'new-upstream')
+      assert.ok(added?.id)
+      assert.equal(added.name, 'New upstream')
+      assert.equal(existing.name, 'Renamed')
+      assert.equal(existing.isDefault, true)
+      assert.equal(existing.stationName, 'ChatGPT Subscription')
+      assert.deepEqual(existing.supportedReasoningEfforts, ['xhigh'])
+      assert.deepEqual(added.supportedReasoningEfforts, ['max'])
+      const saved = await req('/api/models/' + added.id, { ...added, reasoningEffort: 'max' }, 'PUT')
+      assert.equal((await saved.json()).reasoningEffort, 'max')
+      const countBeforeRefresh = catalogCalls
+      const refreshes = await Promise.all([
+        req('/api/models/subscription/sync', {}),
+        req('/api/models/subscription/sync', {})
+      ])
+      assert.deepEqual(await Promise.all(refreshes.map(r => r.json())), [{ count: 2 }, { count: 2 }])
+      assert.equal(catalogCalls, countBeforeRefresh + 1)
+      assert.equal(resolveConn(added.id).reasoningEffort, 'max')
+      assert.deepEqual(
+        (await list()).map(m => m.id),
+        initial.map(m => m.id)
+      )
+
+      catalog = null
+      const failure = await req('/api/models/subscription/sync', {})
+      assert.equal((await failure.json()).code, 'CODEX_NETWORK')
+      assert.deepEqual(
+        (await list()).map(m => m.id),
+        initial.map(m => m.id)
+      )
+
+      catalog = [{ slug: 'stale-result' }]
+      pauseCatalog = Promise.withResolvers()
+      const stale = req('/api/models/subscription/sync', {})
+      while (catalogCalls < countBeforeRefresh + 3) await sleep(5)
+      state = { state: 'connected', connectionRef: other }
+      pauseCatalog.resolve()
+      pauseCatalog = null
+      assert.equal((await (await stale).json()).code, 'CODEX_ACCOUNT_MISMATCH')
+
+      catalog = [{ slug: 'new-upstream', supported_reasoning_levels: [{ effort: 'high' }] }]
+      const otherAccount = await list()
+      assert.ok(!otherAccount.some(m => m.model === 'stale-result'))
+      assert.equal(otherAccount.find(m => m.id === added.id).connectionState, 'account-mismatch')
+      assert.ok(otherAccount.some(m => m.model === added.model && m.id !== added.id && m.connectionRef === other))
+      state = { state: 'connected', connectionRef: ref }
+      catalog = [{ slug: 'new-upstream', supported_reasoning_levels: [{ effort: 'max' }] }]
+      assert.equal((await req('/api/models/' + added.id, undefined, 'DELETE')).status, 200)
+      assert.equal((await req('/api/models/subscription/sync', {})).status, 200)
+      const remaining = await list()
+      assert.ok(!remaining.some(m => m.model === added.model && m.connectionRef === ref))
+      assert.equal(remaining.find(m => m.id === 'codex-a').connectionState, 'catalog-missing')
+      assert.equal(resolveConn('codex-a').model, 'cla-test')
+      catalog = []
     })
 
     await t.test('the local writing and butler loops use subscription streaming', async () => {

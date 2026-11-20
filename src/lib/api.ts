@@ -217,6 +217,7 @@ export const api = {
 
   // 多模型管理
   getModels: () => http<ModelConfig[]>('/api/models'),
+  syncSubscriptionModels: () => http<{ count: number }>('/api/models/subscription/sync', { method: 'POST' }),
   createModel: (m: Partial<ModelConfig>) =>
     http<ModelConfig>('/api/models', { method: 'POST', body: JSON.stringify(m) }),
   updateModel: (id: string, m: Partial<ModelConfig>) =>

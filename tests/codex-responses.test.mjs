@@ -153,7 +153,7 @@ test('reasoning options follow the account catalog and unknown models use upstre
         models: [
           {
             slug: 'with-summary',
-            supported_reasoning_levels: [{ effort: 'low' }],
+            supported_reasoning_levels: [{ effort: 'low' }, { effort: 'xhigh' }, { effort: 'max' }],
             supports_reasoning_summary_parameter: true
           },
           {
@@ -170,7 +170,10 @@ test('reasoning options follow the account catalog and unknown models use upstre
   })
   for (const [model, reasoningEffort] of [
     ['with-summary', 'low'],
+    ['with-summary', 'xhigh'],
+    ['with-summary', 'max'],
     ['without-summary', 'medium'],
+    ['without-summary', 'max'],
     ['no-effort', 'high'],
     ['manual-id', 'high'],
     ['with-summary', 'high']
@@ -180,25 +183,43 @@ test('reasoning options follow the account catalog and unknown models use upstre
   assert.equal(catalogCalls, 1)
   assert.deepEqual(
     bodies.map(body => body.reasoning),
-    [{ effort: 'low', summary: 'auto' }, { effort: 'medium' }, undefined, undefined, undefined]
+    [
+      { effort: 'low', summary: 'auto' },
+      { effort: 'xhigh', summary: 'auto' },
+      { effort: 'max', summary: 'auto' },
+      { effort: 'medium' },
+      undefined,
+      undefined,
+      undefined,
+      undefined
+    ]
   )
 })
 
 test('account catalog presents only unique visible slugs in account order', async () => {
   const { client } = fixture(async (url, { headers }) => {
-    assert.equal(url, 'https://chatgpt.com/backend-api/codex/models?client_version=0.1.0')
+    const upstream = new URL(url)
+    assert.equal(upstream.origin + upstream.pathname, 'https://chatgpt.com/backend-api/codex/models')
     assert.equal(headers['ChatGPT-Account-ID'], 'account-A')
+    if (upstream.searchParams.get('client_version') === '0.1.0') return Response.json({ models: [] })
+    assert.equal(headers['User-Agent'], 'NovelWriter/0.1.0')
     return Response.json({
       models: [
         { slug: 'late', display_name: 'Late', priority: 10 },
         { slug: 'hide-me', visibility: 'hide' },
-        { slug: 'first', display_name: 'First', priority: 1, supported_in_api: false },
+        {
+          slug: 'first',
+          display_name: 'First',
+          priority: 1,
+          supported_in_api: false,
+          supported_reasoning_levels: [{ effort: 'high' }, { effort: 'xhigh' }, { effort: 'max' }, { effort: 'ultra' }]
+        },
         { slug: 'first', display_name: 'Duplicate', priority: 2 }
       ]
     })
   })
   assert.deepEqual(await client.listModels('tenant'), [
-    { id: 'first', label: 'First' },
-    { id: 'late', label: 'Late' }
+    { id: 'first', label: 'First', reasoningEfforts: ['high', 'xhigh', 'max'] },
+    { id: 'late', label: 'Late', reasoningEfforts: [] }
   ])
 })

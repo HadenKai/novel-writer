@@ -1,14 +1,15 @@
-import type { ModelConfig } from '../types'
+import type { ModelConfig, ReasoningEffort } from '../types'
 
 /**
  * 思考强度档位（模型选择器的滑杆用）。
  * 取值与 server/models.mjs 的 normalizeModel 白名单一致：
  *  - Gemini：thinkingLevel = LOW / MEDIUM / HIGH（缺省 MEDIUM）
  *  - OpenAI 兼容：reasoningEffort = default / low / medium / high（default 表示不发该参数，交给服务端决定）
+ *  - ChatGPT Subscription：目录提供可用档位，包括 xhigh / max
  *  - 本地部署：本机推理服务基本不认这些参数，滑杆停用
  */
-export interface ThinkingStep {
-  value: string
+export interface ThinkingStep<T extends string = string> {
+  value: T
   label: string
 }
 
@@ -18,21 +19,39 @@ const GEMINI_STEPS: ThinkingStep[] = [
   { value: 'HIGH', label: '高' }
 ]
 
-const EFFORT_STEPS: ThinkingStep[] = [
+const EFFORT_STEPS: ThinkingStep<ReasoningEffort>[] = [
   { value: 'default', label: '自动' },
   { value: 'low', label: '低' },
   { value: 'medium', label: '中' },
   { value: 'high', label: '高' }
 ]
 
-export function thinkingSteps(m?: ModelConfig | null): ThinkingStep[] {
-  if (!m || m.local) return []
-  return m.provider === 'gemini' ? GEMINI_STEPS : EFFORT_STEPS
+const SUBSCRIPTION_STEPS: typeof EFFORT_STEPS = [
+  ...EFFORT_STEPS,
+  { value: 'xhigh', label: '极高 (Xhigh)' },
+  { value: 'max', label: '最高 (Max)' }
+]
+
+export function reasoningSteps(m: ModelConfig): ThinkingStep<ReasoningEffort>[] {
+  const supported = m.provider === 'chatgpt-subscription' ? m.supportedReasoningEfforts : undefined
+  if (!supported) return EFFORT_STEPS
+  return SUBSCRIPTION_STEPS.filter(step => step.value === 'default' || supported.includes(step.value))
 }
 
-export function thinkingValue(m?: ModelConfig | null): string {
+export function thinkingSteps(m?: ModelConfig | null): ThinkingStep[] {
+  if (!m || m.local) return []
+  return m.provider === 'gemini' ? GEMINI_STEPS : reasoningSteps(m)
+}
+
+export function thinkingValue(
+  m?: Pick<ModelConfig, 'provider' | 'thinkingLevel' | 'reasoningEffort' | 'supportedReasoningEfforts'> | null
+): string {
   if (!m) return ''
-  return m.provider === 'gemini' ? m.thinkingLevel || 'MEDIUM' : m.reasoningEffort || 'default'
+  if (m.provider === 'gemini') return m.thinkingLevel || 'MEDIUM'
+  const effort = m.reasoningEffort || 'default'
+  if (effort !== 'default' && m.supportedReasoningEfforts && !m.supportedReasoningEfforts.includes(effort))
+    return 'default'
+  return effort
 }
 
 export function thinkingLabelOf(m?: ModelConfig | null, value = thinkingValue(m)): string {

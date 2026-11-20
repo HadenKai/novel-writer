@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api } from '../lib/api'
 import { groupOfModels, hostOf } from '../components/ModelSelect'
 import { thinkingShortLabel } from '../lib/constants'
+import { reasoningSteps, thinkingValue } from '../lib/thinking'
 import { confirmDialog, alertDialog } from '../components/Dialog'
 import ModalShell from '../components/ModalShell'
 import CodexConnectionDialog from '../components/CodexConnectionDialog'
@@ -28,6 +29,8 @@ const LOCAL_QUICK = [
   { name: 'vLLM', baseUrl: 'http://127.0.0.1:8000/v1' }
 ]
 const LOCAL_CONTEXT_OPTIONS = [8192, 16384, 32768, 65536, 131072]
+const catalogSyncMessage = (count: number) =>
+  count ? `已同步 ${count} 个账号模型。` : '当前账号的上游目录没有可用模型。'
 const emptyForm = {
   id: '',
   name: '',
@@ -92,7 +95,9 @@ function ModelForm({
   const needsDisconnect = codexStatus?.state === 'disconnect-error'
   const connectionRef = form.connectionRef || activeRef
   const needsRebind = Boolean(activeRef && connectionRef && activeRef !== connectionRef)
-  const showFields = !subscription || Boolean(connectionRef)
+  const showFields = !subscription || Boolean(initial && connectionRef)
+  const effort = thinkingValue(form)
+  const effortSteps = reasoningSteps(form)
 
   useEffect(() => {
     if (!subscription || !codex) return
@@ -117,7 +122,11 @@ function ModelForm({
       setModelNames([])
       setFetchMsg('')
     }
-    setForm(f => ({ ...f, ...p }))
+    setForm(f => ({
+      ...f,
+      ...p,
+      ...(('model' in p || 'connectionRef' in p || 'provider' in p) && { supportedReasoningEfforts: undefined })
+    }))
   }
   const switchProvider = (provider: ModelProvider) => {
     if (provider === form.provider) return
@@ -145,14 +154,14 @@ function ModelForm({
     }
   }
 
-  const connectionChanged = () => {
+  const connectionChanged = (reload = true) => {
     probeSeq.current++
     setFetching(false)
     setModelNames([])
     setFetchMsg('')
     setCodexStatus(null)
     setStatusVersion(value => value + 1)
-    onConnectionChanged()
+    if (reload) onConnectionChanged()
   }
 
   const disconnect = async () => {
@@ -170,25 +179,27 @@ function ModelForm({
       }
     }
   }
+  const syncCatalog = async () => {
+    const seq = ++probeSeq.current
+    setFetching(true)
+    setFetchMsg('')
+    setError('')
+    try {
+      const { count } = await api.syncSubscriptionModels()
+      if (live.current && seq === probeSeq.current) setFetchMsg(catalogSyncMessage(count))
+    } catch (e) {
+      if (live.current && seq === probeSeq.current) setError(`模型同步失败：${(e as Error).message}`)
+    } finally {
+      if (live.current && seq === probeSeq.current) setFetching(false)
+      onConnectionChanged()
+    }
+  }
   const fetchNames = async () => {
-    if (subscription && (!codex || !activeRef || needsRebind)) return
-    if (!subscription && (!form.baseUrl.trim() || (!form.apiKey.trim() && !form.local)))
-      return setFetchMsg('请先填写服务地址和 API Key。')
+    if (!form.baseUrl.trim() || (!form.apiKey.trim() && !form.local)) return setFetchMsg('请先填写服务地址和 API Key。')
     const seq = ++probeSeq.current
     setFetching(true)
     setFetchMsg('')
     try {
-      if (subscription && codex) {
-        const models = await codex.listModels()
-        if (!live.current || seq !== probeSeq.current) return
-        setModelNames(models)
-        setFetchMsg(
-          models.length
-            ? `找到 ${models.length} 个模型，可从下方选择。`
-            : '账号目录暂时没有返回模型，可手动填写模型 ID。'
-        )
-        return
-      }
       const r = await api.probeModels(form.baseUrl.trim(), form.apiKey.trim(), form.provider, form.local)
       if (!live.current || seq !== probeSeq.current) return
       if (r.ok && r.models) {
@@ -199,14 +210,13 @@ function ModelForm({
         )
       } else setFetchMsg(r.error || '获取失败，请检查连接信息或手动填写模型名称。')
     } catch (e) {
-      if (live.current && seq === probeSeq.current)
-        setFetchMsg(subscription ? '暂时无法获取账号目录，可手动填写模型 ID。' : (e as Error).message)
+      if (live.current && seq === probeSeq.current) setFetchMsg((e as Error).message)
     } finally {
       if (live.current && seq === probeSeq.current) setFetching(false)
     }
   }
   const save = async () => {
-    if (saveLock.current) return
+    if (saveLock.current || !showFields) return
     if (subscription) {
       if (!connectionRef || !form.name.trim() || !form.model.trim()) {
         setError('请连接 ChatGPT 并填写显示名称与模型 ID。')
@@ -309,12 +319,22 @@ function ModelForm({
                       {codexStatus?.state === 'reconnect' ? '重新连接 ChatGPT' : '连接 ChatGPT'}
                     </button>
                   )}
+                {activeRef && (
+                  <button
+                    type="button"
+                    className="resources-button"
+                    onClick={syncCatalog}
+                    disabled={fetching || accountBusy}
+                  >
+                    {fetching ? '同步中…' : '同步模型'}
+                  </button>
+                )}
                 {(activeRef || needsDisconnect) && (
                   <button
                     type="button"
                     className="resources-button resources-button--quiet"
                     onClick={disconnect}
-                    disabled={accountBusy}
+                    disabled={accountBusy || fetching}
                   >
                     {accountBusy ? '正在断开…' : needsDisconnect ? '重试断开连接' : '断开连接'}
                   </button>
@@ -342,8 +362,13 @@ function ModelForm({
                           ? `已连接 ${codexStatus.label || 'ChatGPT'}`
                           : codexStatus.state === 'reconnect'
                             ? describeCodexError('CODEX_RECONNECT')
-                            : '使用 Codex 设备码连接你的 ChatGPT 账号。'}
+                            : '连接后，上游模型会自动加入 ChatGPT Subscription 分组。'}
               </p>
+              {(fetching || fetchMsg) && (
+                <p className="resources-hint" role="status">
+                  {fetching ? '正在从 ChatGPT 同步模型…' : fetchMsg}
+                </p>
+              )}
             </div>
           )}
           {showFields && (
@@ -439,16 +464,13 @@ function ModelForm({
                           : 'gpt-4o / deepseek-chat'
                     }
                   />
-                  <button
-                    type="button"
-                    className="resources-button"
-                    onClick={fetchNames}
-                    disabled={fetching || (subscription && (!activeRef || needsRebind))}
-                  >
-                    {fetching ? '获取中…' : subscription ? '获取账号模型' : '获取列表'}
-                  </button>
+                  {!subscription && (
+                    <button type="button" className="resources-button" onClick={fetchNames} disabled={fetching}>
+                      {fetching ? '获取中…' : '获取列表'}
+                    </button>
+                  )}
                 </div>
-                {fetchMsg && (
+                {!subscription && fetchMsg && (
                   <p className="resources-hint" role="status">
                     {fetchMsg}
                   </p>
@@ -493,20 +515,20 @@ function ModelForm({
                   <div className="resources-field">
                     <span id="reasoning-label">思考强度 · Reasoning Effort</span>
                     <div className="resources-segmented" role="group" aria-labelledby="reasoning-label">
-                      {(['default', 'low', 'medium', 'high'] as const).map(level => (
+                      {effortSteps.map(step => (
                         <button
                           type="button"
-                          key={level}
-                          aria-pressed={(form.reasoningEffort || 'default') === level}
-                          onClick={() => patch({ reasoningEffort: level })}
+                          key={step.value}
+                          aria-pressed={effort === step.value}
+                          onClick={() => patch({ reasoningEffort: step.value })}
                         >
-                          {{ default: '默认', low: '低', medium: '中', high: '高' }[level]}
+                          {step.label}
                         </button>
                       ))}
                     </div>
                     <p className="resources-hint">
                       {subscription
-                        ? '档位在订阅模型支持时生效。'
+                        ? '可用档位由上游模型目录决定。'
                         : '默认不发送 reasoning_effort 参数，其余选项由兼容服务决定是否支持。'}
                     </p>
                   </div>
@@ -540,15 +562,17 @@ function ModelForm({
             onClick={onCancel}
             disabled={saving}
           >
-            取消
+            {showFields ? '取消' : '关闭'}
           </button>
-          <button
-            type="submit"
-            className="resources-button resources-button--primary"
-            disabled={saving || accountBusy || !showFields}
-          >
-            {saving ? '保存中…' : '保存模型'}
-          </button>
+          {showFields && (
+            <button
+              type="submit"
+              className="resources-button resources-button--primary"
+              disabled={saving || accountBusy}
+            >
+              {saving ? '保存中…' : '保存模型'}
+            </button>
+          )}
         </div>
       </form>
       {showCodex && codex && (
@@ -557,7 +581,8 @@ function ModelForm({
           onClose={() => setShowCodex(false)}
           onConnected={() => {
             setShowCodex(false)
-            connectionChanged()
+            connectionChanged(false)
+            void syncCatalog()
           }}
         />
       )}
@@ -1051,19 +1076,21 @@ export default function SettingsPage() {
       else next.add(key)
       return next
     })
-  const importGroup = async (g: ModelGroup) => {
+  const refreshGroup = async (g: ModelGroup) => {
     if (modelLock.current) return
     modelLock.current = true
     setModelBusy(g.key)
     setGroupErr(prev => ({ ...prev, [g.key]: '' }))
     setGroupMsg(prev => ({ ...prev, [g.key]: '' }))
     try {
-      const r = await api.importGroupModels(g.baseUrl)
+      const message =
+        g.provider === 'chatgpt-subscription'
+          ? catalogSyncMessage((await api.syncSubscriptionModels()).count)
+          : await api
+              .importGroupModels(g.baseUrl)
+              .then(r => `导入完成：新增 ${r.added ?? 0} 个模型${r.skipped ? `，跳过 ${r.skipped} 个重复` : ''}。`)
       if (!live.current) return
-      setGroupMsg(prev => ({
-        ...prev,
-        [g.key]: `导入完成：新增 ${r.added ?? 0} 个模型${r.skipped ? `，跳过 ${r.skipped} 个重复` : ''}。`
-      }))
+      setGroupMsg(prev => ({ ...prev, [g.key]: message }))
       await load()
     } catch (e) {
       if (live.current) setGroupErr(prev => ({ ...prev, [g.key]: (e as Error).message }))
@@ -1326,7 +1353,11 @@ export default function SettingsPage() {
                             : 'OpenAI 兼容'}
                     </span>
                     <div className="resources-actions">
-                      {g.provider !== 'chatgpt-subscription' && (
+                      {g.provider === 'chatgpt-subscription' ? (
+                        <button className="resources-button" disabled={modelDisabled} onClick={() => refreshGroup(g)}>
+                          {modelBusy === g.key ? '同步中…' : '同步模型'}
+                        </button>
+                      ) : (
                         <>
                           <button
                             className="resources-button resources-button--quiet"
@@ -1342,7 +1373,7 @@ export default function SettingsPage() {
                             className="resources-button"
                             disabled={modelDisabled}
                             title="使用本站已保存的密钥，仅补充新模型"
-                            onClick={() => importGroup(g)}
+                            onClick={() => refreshGroup(g)}
                           >
                             {modelBusy === g.key ? '导入中…' : '导入新模型'}
                           </button>

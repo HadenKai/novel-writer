@@ -1,7 +1,10 @@
 import { codexError, isCodexRegionDenied } from './codex-oauth.mjs'
 
 export const CODEX_PROVIDER = 'chatgpt-subscription'
+export const CODEX_REASONING_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max']
 const BASE = 'https://chatgpt.com/backend-api/codex'
+// This endpoint filters models by Codex client compatibility, independently of the app's own version.
+const CATALOG_CLIENT_VERSION = '0.171.0'
 const CONNECT_TIMEOUT = 30_000
 const FIRST_CHUNK_TIMEOUT = 300_000
 const CHUNK_TIMEOUT = 120_000
@@ -170,7 +173,7 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
     let payload
     try {
       const response = await request(
-        '/models?client_version=' + encodeURIComponent(appVersion),
+        '/models?client_version=' + CATALOG_CLIENT_VERSION,
         connectionRef,
         {
           method: 'GET',
@@ -197,14 +200,15 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
     for (const m of visible) {
       const id = m.slug.trim()
       if (models.has(id)) continue
+      const levels = Array.isArray(m.supported_reasoning_levels) ? m.supported_reasoning_levels : []
+      const reasoningEfforts = CODEX_REASONING_EFFORTS.filter(effort => levels.some(level => level?.effort === effort))
       models.set(id, {
         id,
-        label: typeof m.display_name === 'string' && m.display_name.trim() ? m.display_name.trim() : id
+        label: typeof m.display_name === 'string' && m.display_name.trim() ? m.display_name.trim() : id,
+        reasoningEfforts
       })
       capabilities.set(id, {
-        efforts: Array.isArray(m.supported_reasoning_levels)
-          ? m.supported_reasoning_levels.map(level => level?.effort)
-          : [],
+        efforts: reasoningEfforts,
         summary: m.supports_reasoning_summary_parameter === true
       })
     }
@@ -213,13 +217,14 @@ export function createCodexClient({ auth, fetchImpl = fetch, appVersion = '0.1.0
   }
 
   async function reasoningFor({ model, connectionRef, reasoningEffort }, signal) {
-    if (!['low', 'medium', 'high'].includes(reasoningEffort)) return null
+    if (!CODEX_REASONING_EFFORTS.includes(reasoningEffort)) return null
     if (catalog?.connectionRef !== connectionRef || catalog.expiresAt <= Date.now()) {
+      const previous = catalog
       try {
         await listModels(connectionRef, { signal, optional: true })
       } catch {
         signal.throwIfAborted()
-        catalog = { connectionRef, expiresAt: Date.now() + 30_000, capabilities: new Map() }
+        if (catalog === previous) catalog = { connectionRef, expiresAt: Date.now() + 30_000, capabilities: new Map() }
       }
     }
     const capability = catalog?.connectionRef === connectionRef ? catalog.capabilities.get(model) : null
