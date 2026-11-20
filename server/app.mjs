@@ -190,8 +190,7 @@ app.post('/api/ai/parse-settings', async (req, res) => {
   if (raw.length < 10) return res.status(400).json({ error: '设定内容太短，直接手动填更方便' })
 
   // 分拣可指定模型（前端透传）；未指定时用书的默认模型
-  const wantConn = resolveConn(req.body?.modelId)
-  const conn = wantConn || resolveConn(novel.modelId)
+  const conn = resolveConn(req.body?.modelId || novel.modelId)
   if (!conn) return res.status(400).json({ error: '还没有配置模型，请先到【模型设置】添加' })
 
   try {
@@ -899,6 +898,7 @@ app.post('/api/novels', (req, res) => {
 function upstreamFailHint(e) {
   const st = Number(e?.status)
   const raw = String(e?.message || e)
+  if (typeof e?.code === 'string' && e.code.startsWith('CODEX_')) return raw
   const head =
     st === 401
       ? '模型鉴权失败（401）：API Key 无效或已过期，请到「模型设置」重新粘贴'

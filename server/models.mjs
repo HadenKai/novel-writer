@@ -6,7 +6,9 @@ import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { fileURLToPath } from 'node:url'
-import { normalizeOpenAIBase } from './ai.mjs'
+import { normalizeOpenAIBase, streamChat } from './ai.mjs'
+import { CODEX_PROVIDER, getCodexClient } from './codex-responses.mjs'
+import { codexError } from './codex-oauth.mjs'
 import { probeLocalEndpoint, scanLocalEndpoints } from './local-models.mjs'
 import {
   AUTHOR_STYLES,
@@ -94,12 +96,31 @@ export function normalizeModel(m) {
   const reasoningEffort = ['default', 'low', 'medium', 'high'].includes(m.reasoningEffort)
     ? m.reasoningEffort
     : 'default'
+  if (m.provider === CODEX_PROVIDER) {
+    const connectionRef =
+      typeof m.connectionRef === 'string' && /^[a-f0-9]{64}$/.test(m.connectionRef) ? m.connectionRef : ''
+    return {
+      id: m.id,
+      name: String(m.name || '').trim(),
+      model: String(m.model || '').trim(),
+      isDefault: !!m.isDefault,
+      baseUrl: '',
+      apiKey: '',
+      temperature: 0.8,
+      provider: CODEX_PROVIDER,
+      local: false,
+      contextTokens: 0,
+      reasoningEffort,
+      connectionRef
+    }
+  }
   const base = String(m.baseUrl || '').trim()
   const local = !!m.local && provider === 'openai'
   const rawCtx = Number(m.contextTokens)
   const contextTokens = Number.isFinite(rawCtx) && rawCtx >= 2048 ? Math.min(Math.floor(rawCtx), 1_048_576) : 0
   return {
-    ...m,
+    id: m.id,
+    isDefault: !!m.isDefault,
     name: String(m.name || '').trim(),
     baseUrl: provider === 'gemini' ? base : normalizeOpenAIBase(base),
     apiKey: revealApiKey(m.apiKey),
@@ -126,12 +147,83 @@ export function listModels() {
 export function maskModel(m) {
   const k = m.apiKey || ''
   const masked = k.length >= 8 ? `${k.slice(0, 3)}****${k.slice(-4)}` : k ? '****' : ''
-  return { ...m, apiKey: masked, hasKey: !!k }
+  const {
+    id,
+    name,
+    model,
+    baseUrl,
+    temperature,
+    provider,
+    local,
+    isDefault,
+    contextTokens,
+    thinkingLevel,
+    reasoningEffort,
+    stationName
+  } = m
+  const publicModel = {
+    id,
+    name,
+    model,
+    baseUrl,
+    temperature,
+    provider,
+    local,
+    isDefault,
+    contextTokens,
+    thinkingLevel,
+    reasoningEffort,
+    stationName: stationName || '',
+    apiKey: masked,
+    hasKey: !!k
+  }
+  if (provider !== CODEX_PROVIDER) return publicModel
+  const status = getCodexClient()?.status()
+  const connectionState =
+    !status || status.state === 'unavailable'
+      ? 'unavailable'
+      : status.state !== 'connected'
+        ? 'reconnect'
+        : status.connectionRef === m.connectionRef
+          ? 'connected'
+          : 'account-mismatch'
+  return { ...publicModel, connectionRef: m.connectionRef, connectionState }
 }
 
 export function validModel(m) {
   // 本地模型允许空密钥：要求填 Key 会把绝大多数本机推理服务挡在门外
+  if (m?.provider === CODEX_PROVIDER) return Boolean(m.name && m.model && m.connectionRef)
   return !!(m && m.name && m.baseUrl && m.model && (m.apiKey || m.local))
+}
+
+function validateModelBinding(model, previous) {
+  if (
+    model.provider !== CODEX_PROVIDER ||
+    (previous?.provider === CODEX_PROVIDER && previous.connectionRef === model.connectionRef)
+  )
+    return
+  const status = getCodexClient()?.status()
+  if (!status || status.state === 'unavailable') throw codexError('CODEX_UNAVAILABLE')
+  if (status.state !== 'connected') throw codexError('CODEX_RECONNECT')
+  if (status.connectionRef !== model.connectionRef) throw codexError('CODEX_ACCOUNT_MISMATCH')
+}
+
+function subscriptionRouteError(res, error) {
+  const issue = codexError(String(error?.code || 'CODEX_INVALID_RESPONSE'))
+  return res.status(400).json({ error: issue.message, code: issue.code })
+}
+
+function subscriptionCatalogOnly(res) {
+  return res.status(400).json({ error: '请从 ChatGPT Subscription 的账号连接中选择模型。' })
+}
+
+function validationError(res, model) {
+  return res.status(400).json({
+    error:
+      model?.provider === CODEX_PROVIDER
+        ? '请填写名称、模型 ID 并绑定一个 ChatGPT 账号。'
+        : '名称、地址、模型名不能为空（非本地部署还需 API Key）'
+  })
 }
 
 /**
@@ -187,9 +279,13 @@ export function resolveConn(modelId) {
     list.find(x => String(x.name || '').trim() === key) ||
     list.find(x => x.isDefault) ||
     list[0]
-  if (!m) return null
+  return m ? modelConnection(m) : null
+}
+
+function modelConnection(m) {
   return {
     id: m.id,
+    ...(m.provider === CODEX_PROVIDER && { connectionRef: m.connectionRef }),
     baseUrl: m.baseUrl,
     apiKey: m.apiKey,
     model: m.model,
@@ -209,7 +305,12 @@ export function registerModelRoutes(app) {
 
   app.post('/api/models', async (req, res) => {
     const m = normalizeModel({ ...req.body, id: req.body?.id || crypto.randomUUID() })
-    if (!validModel(m)) return res.status(400).json({ error: '名称、地址、模型名不能为空（非本地部署还需 API Key）' })
+    if (!validModel(m)) return validationError(res, m)
+    try {
+      validateModelBinding(m)
+    } catch (error) {
+      return subscriptionRouteError(res, error)
+    }
     let dup = false
     await mutateModels(list => {
       // 同 id 两条会让 PUT 只改第一条、DELETE 删全部、resolveConn 永远命中第一条
@@ -227,6 +328,7 @@ export function registerModelRoutes(app) {
   app.put('/api/models/:id', async (req, res) => {
     let status = 200
     let payload = null
+    let bindingError = null
     await mutateModels(list => {
       const i = list.findIndex(x => x.id === req.params.id)
       if (i < 0) {
@@ -234,11 +336,21 @@ export function registerModelRoutes(app) {
         return
       }
       const incoming = { ...req.body, id: req.params.id }
+      if (incoming.provider === CODEX_PROVIDER && incoming.connectionRef === undefined) {
+        incoming.connectionRef = list[i].connectionRef
+      }
       // 前端拿到的是掩码密钥；未修改时沿用原密钥
       if (!incoming.apiKey || /\*\*\*\*/.test(incoming.apiKey)) incoming.apiKey = list[i].apiKey
       const m = normalizeModel(incoming)
       if (!validModel(m)) {
         status = 400
+        payload = m
+        return
+      }
+      try {
+        validateModelBinding(m, list[i])
+      } catch (error) {
+        bindingError = error
         return
       }
       if (m.isDefault)
@@ -250,7 +362,8 @@ export function registerModelRoutes(app) {
       return list
     })
     if (status === 404) return res.status(404).json({ error: '模型不存在' })
-    if (status === 400) return res.status(400).json({ error: '名称、地址、模型名不能为空（非本地部署还需 API Key）' })
+    if (status === 400) return validationError(res, payload)
+    if (bindingError) return subscriptionRouteError(res, bindingError)
     res.json(payload)
   })
 
@@ -272,6 +385,7 @@ export function registerModelRoutes(app) {
 
   // 探测某个地址+密钥可用的模型名（不落盘）
   app.post('/api/models/probe', async (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const provider = req.body?.provider === 'gemini' ? 'gemini' : 'openai'
     const baseRaw = String(req.body?.baseUrl || '').trim()
     const baseUrl = provider === 'gemini' ? baseRaw : normalizeOpenAIBase(baseRaw)
@@ -317,6 +431,7 @@ export function registerModelRoutes(app) {
 
   // 把扫描结果里的模型批量加入连接（缺省模型自动设为默认）
   app.post('/api/models/local/add', async (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const baseUrl = normalizeOpenAIBase(String(req.body?.baseUrl || '').trim())
     const names = Array.isArray(req.body?.models)
       ? req.body.models
@@ -363,6 +478,7 @@ export function registerModelRoutes(app) {
 
   // 给中转站起名 / 清空名字（清空后前端回落显示域名）
   app.post('/api/models/stations/name', (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const provider = req.body?.provider === 'gemini' ? 'gemini' : 'openai'
     const baseUrl = String(req.body?.baseUrl || '')
       .trim()
@@ -380,6 +496,7 @@ export function registerModelRoutes(app) {
   })
 
   app.post('/api/models/import', async (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const provider = req.body?.provider === 'gemini' ? 'gemini' : 'openai'
     const rawBaseUrl = String(req.body?.baseUrl || '').trim()
     const baseUrl = provider === 'gemini' ? rawBaseUrl.replace(/\/+$/, '') : normalizeOpenAIBase(rawBaseUrl)
@@ -436,12 +553,15 @@ export function registerModelRoutes(app) {
 
   // 一键导入「此站新模型」：复用该站已有密钥，只补齐未收录的模型名，重复跳过
   app.post('/api/models/import-group', async (req, res) => {
+    if (req.body?.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     const baseUrl = String(req.body?.baseUrl || '')
       .trim()
       .replace(/\/+$/, '')
     if (!baseUrl) return res.status(400).json({ error: '地址不合法' })
     const list = listModels()
-    const siblings = list.filter(m => (m.baseUrl || '').replace(/\/+$/, '') === baseUrl)
+    const siblings = list.filter(
+      m => m.provider !== CODEX_PROVIDER && (m.baseUrl || '').replace(/\/+$/, '') === baseUrl
+    )
     if (!siblings.length) return res.status(400).json({ error: '这个地址还没有模型，请先手动添加一个' })
     const tpl = siblings[0] // 复用同站第一个模型的密钥与 provider
     try {
@@ -498,20 +618,12 @@ export function registerModelRoutes(app) {
   app.post('/api/models/:id/test', async (req, res) => {
     const m = listModels().find(x => x.id === req.params.id)
     if (!m) return res.status(404).json({ error: '模型不存在' })
-    const conn = {
-      id: m.id,
-      baseUrl: m.baseUrl,
-      apiKey: m.apiKey,
-      model: m.model,
-      temperature: m.temperature,
-      provider: m.provider,
-      thinkingLevel: m.thinkingLevel,
-      reasoningEffort: m.reasoningEffort
-    }
+    const conn = modelConnection(m)
     try {
-      const out = await probeChat(conn)
+      const out = conn.provider === CODEX_PROVIDER ? await probeSubscription(conn) : await probeChat(conn)
       res.json({ ok: true, reply: out })
     } catch (e) {
+      if (conn.provider === CODEX_PROVIDER) return subscriptionRouteError(res, e)
       res.status(400).json({ error: String(e.message || e) })
     }
   })
@@ -521,6 +633,7 @@ export function registerModelRoutes(app) {
     const list = listModels()
     const m = list.find(x => x.id === req.params.id)
     if (!m) return res.status(404).json({ error: '模型不存在' })
+    if (m.provider === CODEX_PROVIDER) return subscriptionCatalogOnly(res)
     try {
       const headers = m.provider === 'gemini' ? { 'x-goog-api-key': m.apiKey } : { Authorization: `Bearer ${m.apiKey}` }
       const r = await fetch(`${m.baseUrl}/models`, { headers, signal: AbortSignal.timeout(20000) })
@@ -537,6 +650,24 @@ export function registerModelRoutes(app) {
       res.status(400).json({ error: String(e.message || e) })
     }
   })
+}
+
+async function probeSubscription(conn) {
+  let reply = ''
+  const messages = [
+    { role: 'system', content: '这是一条连接测试，回答一个短句。' },
+    { role: 'user', content: '请回复你好。' }
+  ]
+  try {
+    for await (const event of streamChat(conn, { messages, signal: AbortSignal.timeout(60_000) })) {
+      if (event.type === 'content') reply = (reply + event.text).slice(0, 80)
+    }
+  } catch (error) {
+    if (error.name === 'TimeoutError') throw codexError('CODEX_NETWORK')
+    throw error
+  }
+  if (!reply.trim()) throw codexError('CODEX_INVALID_RESPONSE')
+  return reply
 }
 
 /** 发一次极小的对话请求，验证密钥/地址可用 */
