@@ -9,7 +9,7 @@
  *  - 上游模型错误：按状态码给出作者能照着做的动作，并保留原始信息便于反馈；
  *  - 本地服务错误：401 多为多实例并存导致的授权不一致，需要重启应用。
  */
-import type { GenJob } from '../types'
+import type { CodexModelConnectionState, GenJob } from '../types'
 
 /** 上游模型错误（按 HTTP 状态码）→ 可照做的中文提示 */
 const UPSTREAM_HINT: Record<number, string> = {
@@ -25,9 +25,31 @@ const UPSTREAM_HINT: Record<number, string> = {
  *
  * 按 errorStatus 分开说明，未知情况回落到原始错误文本。
  */
-export function describeModelError(job: Pick<GenJob, 'error' | 'errorStatus'>): string {
+export function describeModelError(job: Pick<GenJob, 'error' | 'errorStatus' | 'errorCode'>): string {
+  if (job.errorCode?.startsWith('CODEX_')) return describeCodexError(job.errorCode, job.error)
   const hint = job.errorStatus ? UPSTREAM_HINT[job.errorStatus] : undefined
   return hint ? `${hint}\n\n原始信息：${job.error}` : job.error
+}
+
+const CODEX_HINT: Record<string, string> = {
+  CODEX_RECONNECT: 'ChatGPT 授权已失效，请在 AI 模型中重新连接。',
+  CODEX_ACCOUNT_MISMATCH: '此模型绑定了其他 ChatGPT 账号或工作区，请在 AI 模型中重新绑定。',
+  CODEX_MODEL_FORBIDDEN: '当前 ChatGPT 账号或工作区无法使用此模型。',
+  CODEX_RATE_LIMIT: 'ChatGPT 订阅用量已达上限，请查看 ChatGPT 用量。',
+  CODEX_NETWORK: '无法连接 ChatGPT 服务，请检查网络后重试。',
+  CODEX_UNAVAILABLE: '当前环境无法使用 ChatGPT Subscription。',
+  CODEX_DEVICE_DISABLED: '设备码授权未开放，请检查 ChatGPT 安全设置或工作区权限。'
+}
+
+export function describeCodexError(code?: string, fallback = '无法完成 ChatGPT 授权，请重试。'): string {
+  return (code && CODEX_HINT[code]) || fallback
+}
+
+export function codexModelStateLabel(state?: CodexModelConnectionState): string {
+  if (state === 'reconnect') return '需要连接'
+  if (state === 'account-mismatch') return '账号不匹配'
+  if (state === 'unavailable') return '当前环境不可用'
+  return ''
 }
 
 /** 本地服务返回非 2xx 时的提示（raw 为服务端 body 里的 error 字段或默认文案） */

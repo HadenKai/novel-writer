@@ -227,8 +227,8 @@ export interface ParsedSettings {
   extraRequirements: string
 }
 
-/** 模型服务供应商：openai 兼容接口 / 谷歌 Gemini 原生接口 */
-export type ModelProvider = 'openai' | 'gemini'
+export type ModelProvider = 'openai' | 'gemini' | 'chatgpt-subscription'
+export type CodexModelConnectionState = 'connected' | 'reconnect' | 'account-mismatch' | 'unavailable'
 
 export interface ModelConfig {
   id: string
@@ -240,8 +240,9 @@ export interface ModelConfig {
   model: string
   temperature: number
   isDefault: boolean
-  /** 接入协议：Gemini 原生 generateContent，其余为 OpenAI 兼容 chat/completions */
   provider?: ModelProvider
+  connectionRef?: string
+  connectionState?: CodexModelConnectionState
   /** Gemini 3.x 思考等级（openai 系忽略）：LOW / MEDIUM / HIGH */
   thinkingLevel?: 'LOW' | 'MEDIUM' | 'HIGH'
   reasoningEffort?: 'default' | 'low' | 'medium' | 'high'

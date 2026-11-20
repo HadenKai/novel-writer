@@ -30,16 +30,18 @@ import type {
   KbQaEntry,
   SensitiveResult
 } from '../types'
-import { describeHttpError } from './errors'
+import { describeCodexError, describeHttpError } from './errors'
 
 // API 错误保留 HTTP 状态，便于区分本地服务、会话存储和上游模型错误。
 export class ApiError extends Error {
   readonly status: number
+  readonly code?: string
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -63,14 +65,17 @@ async function http<T>(url: string, options?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     let msg = `请求失败 (${res.status})`
+    let code: string | undefined
     try {
       const j = await res.json()
       if (j.error) msg = j.error
+      if (typeof j.code === 'string') code = j.code
     } catch {}
+    if (code?.startsWith('CODEX_')) throw new ApiError(describeCodexError(code, msg), res.status, code)
     // 状态码 → 中文提示 的映射收口在 lib/errors.ts，避免与上游模型错误的文案各写一份
     msg = describeHttpError(res.status, msg)
     if (res.status === 404) throw new NotFoundError(msg)
-    throw new ApiError(msg, res.status)
+    throw new ApiError(msg, res.status, code)
   }
   return res.json() as Promise<T>
 }

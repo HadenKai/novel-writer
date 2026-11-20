@@ -4,6 +4,9 @@ import { groupOfModels, hostOf } from '../components/ModelSelect'
 import { thinkingShortLabel } from '../lib/constants'
 import { confirmDialog, alertDialog } from '../components/Dialog'
 import ModalShell from '../components/ModalShell'
+import CodexConnectionDialog from '../components/CodexConnectionDialog'
+import { desktop, type CodexConnectionStatus } from '../lib/desktop'
+import { codexModelStateLabel, describeCodexError } from '../lib/errors'
 import type { ModelConfig, ModelProvider } from '../types'
 import './resources.css'
 import './resources-ink.css'
@@ -62,23 +65,52 @@ function useLiveFlag() {
 function ModelForm({
   initial,
   onDone,
-  onCancel
+  onCancel,
+  onConnectionChanged
 }: {
   initial: ModelConfig | null
   onDone: () => void
   onCancel: () => void
+  onConnectionChanged: () => void
 }) {
-  const [form, setForm] = useState(initial ? { ...initial } : { ...emptyForm })
+  const [form, setForm] = useState<ModelConfig>(initial ? { ...initial } : { ...emptyForm })
   const [saving, setSaving] = useState(false)
   const [fetching, setFetching] = useState(false)
-  const [modelNames, setModelNames] = useState<string[]>([])
+  const [modelNames, setModelNames] = useState<{ id: string; label: string }[]>([])
   const [fetchMsg, setFetchMsg] = useState('')
   const [error, setError] = useState('')
   const live = useLiveFlag()
   const probeSeq = useRef(0)
   const saveLock = useRef(false)
+  const codex = desktop()?.codex
+  const subscription = form.provider === 'chatgpt-subscription'
+  const [codexStatus, setCodexStatus] = useState<CodexConnectionStatus | null>(null)
+  const [showCodex, setShowCodex] = useState(false)
+  const [accountBusy, setAccountBusy] = useState(false)
+  const [statusVersion, setStatusVersion] = useState(0)
+  const activeRef = codexStatus?.state === 'connected' ? codexStatus.connectionRef : undefined
+  const connectionRef = form.connectionRef || activeRef
+  const needsRebind = Boolean(activeRef && connectionRef && activeRef !== connectionRef)
+  const showFields = !subscription || Boolean(connectionRef)
+
+  useEffect(() => {
+    if (!subscription || !codex) return
+    let cancelled = false
+    void codex.status().then(
+      status => {
+        if (!cancelled) setCodexStatus(status)
+      },
+      () => {
+        if (!cancelled) setCodexStatus({ state: 'unavailable' })
+      }
+    )
+    return () => {
+      cancelled = true
+    }
+  }, [subscription, codex, statusVersion])
+
   const patch = (p: Partial<typeof form>) => {
-    if ('baseUrl' in p || 'apiKey' in p || 'provider' in p) {
+    if ('baseUrl' in p || 'apiKey' in p || 'provider' in p || 'connectionRef' in p) {
       probeSeq.current++
       setFetching(false)
       setModelNames([])
@@ -86,36 +118,105 @@ function ModelForm({
     }
     setForm(f => ({ ...f, ...p }))
   }
-  const switchProvider = (provider: ModelProvider) =>
-    patch(
-      provider === 'gemini'
-        ? { provider, local: false, baseUrl: GEMINI_BASE.baseUrl, model: form.model || 'gemini-3.8-flash' }
-        : { provider, baseUrl: form.baseUrl === GEMINI_BASE.baseUrl ? '' : form.baseUrl }
-    )
+  const switchProvider = (provider: ModelProvider) => {
+    if (provider === form.provider) return
+    setError('')
+    if (provider === 'chatgpt-subscription') {
+      setCodexStatus(null)
+      patch({
+        provider,
+        baseUrl: '',
+        apiKey: '',
+        local: false,
+        model: initial?.provider === provider ? initial.model : '',
+        connectionRef: initial?.provider === provider ? initial.connectionRef : undefined
+      })
+    } else if (provider === 'gemini') {
+      patch({
+        provider,
+        connectionRef: undefined,
+        local: false,
+        baseUrl: GEMINI_BASE.baseUrl,
+        model: form.model || 'gemini-3.8-flash'
+      })
+    } else {
+      patch({ provider, connectionRef: undefined, baseUrl: form.baseUrl === GEMINI_BASE.baseUrl ? '' : form.baseUrl })
+    }
+  }
+
+  const connectionChanged = () => {
+    probeSeq.current++
+    setFetching(false)
+    setModelNames([])
+    setFetchMsg('')
+    setCodexStatus(null)
+    setStatusVersion(value => value + 1)
+    onConnectionChanged()
+  }
+
+  const disconnect = async () => {
+    if (!codex || accountBusy) return
+    setAccountBusy(true)
+    setError('')
+    try {
+      await codex.disconnect()
+    } catch {
+      if (live.current) setError('无法断开 ChatGPT 连接，请重试。')
+    } finally {
+      if (live.current) {
+        connectionChanged()
+        setAccountBusy(false)
+      }
+    }
+  }
   const fetchNames = async () => {
-    if (!form.baseUrl.trim() || (!form.apiKey.trim() && !form.local)) return setFetchMsg('请先填写服务地址和 API Key。')
+    if (subscription && (!codex || !activeRef || needsRebind)) return
+    if (!subscription && (!form.baseUrl.trim() || (!form.apiKey.trim() && !form.local)))
+      return setFetchMsg('请先填写服务地址和 API Key。')
     const seq = ++probeSeq.current
     setFetching(true)
     setFetchMsg('')
     try {
+      if (subscription && codex) {
+        const models = await codex.listModels()
+        if (!live.current || seq !== probeSeq.current) return
+        setModelNames(models)
+        setFetchMsg(
+          models.length
+            ? `找到 ${models.length} 个模型，可从下方选择。`
+            : '账号目录暂时没有返回模型，可手动填写模型 ID。'
+        )
+        return
+      }
       const r = await api.probeModels(form.baseUrl.trim(), form.apiKey.trim(), form.provider, form.local)
       if (!live.current || seq !== probeSeq.current) return
       if (r.ok && r.models) {
-        setModelNames(r.models)
+        setModelNames(r.models.map(id => ({ id, label: id })))
         setForm(f => ({ ...f, model: f.model || r.models?.[0] || '' }))
         setFetchMsg(
           r.models.length ? `找到 ${r.models.length} 个模型，可从下方选择。` : '服务未返回模型，可手动填写模型名称。'
         )
       } else setFetchMsg(r.error || '获取失败，请检查连接信息或手动填写模型名称。')
     } catch (e) {
-      if (live.current && seq === probeSeq.current) setFetchMsg((e as Error).message)
+      if (live.current && seq === probeSeq.current)
+        setFetchMsg(subscription ? '暂时无法获取账号目录，可手动填写模型 ID。' : (e as Error).message)
     } finally {
       if (live.current && seq === probeSeq.current) setFetching(false)
     }
   }
   const save = async () => {
     if (saveLock.current) return
-    if (!form.name.trim() || !form.baseUrl.trim() || !form.model.trim() || (!form.apiKey.trim() && !form.local)) {
+    if (subscription) {
+      if (!connectionRef || !form.name.trim() || !form.model.trim()) {
+        setError('请连接 ChatGPT 并填写显示名称与模型 ID。')
+        return
+      }
+    } else if (
+      !form.name.trim() ||
+      !form.baseUrl.trim() ||
+      !form.model.trim() ||
+      (!form.apiKey.trim() && !form.local)
+    ) {
       setError('请填写显示名称、服务地址和模型名称（非本地部署还需 API Key）。')
       return
     }
@@ -123,8 +224,9 @@ function ModelForm({
     setSaving(true)
     setError('')
     try {
-      if (initial) await api.updateModel(initial.id, form)
-      else await api.createModel(form)
+      const model = subscription ? { ...form, connectionRef } : form
+      if (initial) await api.updateModel(initial.id, model)
+      else await api.createModel(model)
       if (live.current) onDone()
     } catch (e) {
       if (live.current) setError((e as Error).message)
@@ -156,12 +258,25 @@ function ModelForm({
               接入协议
             </span>
             <div className="resources-segmented" role="group" aria-labelledby="model-provider-label">
-              <button type="button" aria-pressed={form.provider !== 'gemini'} onClick={() => switchProvider('openai')}>
+              <button
+                type="button"
+                aria-pressed={!subscription && form.provider !== 'gemini'}
+                onClick={() => switchProvider('openai')}
+              >
                 OpenAI 兼容
               </button>
               <button type="button" aria-pressed={form.provider === 'gemini'} onClick={() => switchProvider('gemini')}>
                 Google Gemini
               </button>
+              {(codex || subscription) && (
+                <button
+                  type="button"
+                  aria-pressed={subscription}
+                  onClick={() => switchProvider('chatgpt-subscription')}
+                >
+                  ChatGPT Subscription
+                </button>
+              )}
             </div>
             {form.provider === 'gemini' && (
               <p className="resources-hint">使用官方 generateContent 协议，填写 Google API Key。</p>
@@ -176,144 +291,226 @@ function ModelForm({
               </label>
             )}
           </div>
-          <label className="resources-field">
-            显示名称
-            <input
-              value={form.name}
-              onChange={e => patch({ name: e.target.value })}
-              placeholder="例如：日常写作 · DeepSeek"
-              autoComplete="off"
-            />
-          </label>
-          <label className="resources-field">
-            服务地址 · API Base URL
-            <input
-              value={form.baseUrl}
-              onChange={e => patch({ baseUrl: e.target.value })}
-              placeholder="https://你的服务地址（兼容接口自动补 /v1）"
-              spellCheck={false}
-            />
-          </label>
-          <div className="resources-quick-links" aria-label="常用服务地址">
-            {(form.provider === 'gemini' ? [GEMINI_BASE] : form.local ? LOCAL_QUICK : QUICK_BASES).map(q => (
-              <button
-                type="button"
-                key={q.name}
-                aria-pressed={form.baseUrl === q.baseUrl}
-                onClick={() => patch({ baseUrl: q.baseUrl })}
-              >
-                {q.name}
-              </button>
-            ))}
-          </div>
-          {form.local ? (
+          {subscription && (
             <div className="resources-field">
-              <span id="local-ctx-label">上下文窗口</span>
-              <div className="resources-segmented" role="group" aria-labelledby="local-ctx-label">
-                {LOCAL_CONTEXT_OPTIONS.map(n => (
+              <span>ChatGPT 账号 · 实验性</span>
+              <div className="resources-actions">
+                {codex && codexStatus?.state !== 'connected' && codexStatus?.state !== 'unavailable' && (
                   <button
                     type="button"
-                    key={n}
-                    aria-pressed={Number(form.contextTokens) === n}
-                    onClick={() => patch({ contextTokens: n })}
+                    className="resources-button"
+                    onClick={() => setShowCodex(true)}
+                    disabled={!codexStatus || accountBusy}
                   >
-                    {n / 1024}k
+                    {codexStatus?.state === 'reconnect' ? '重新连接 ChatGPT' : '连接 ChatGPT'}
                   </button>
-                ))}
+                )}
+                {activeRef && (
+                  <button
+                    type="button"
+                    className="resources-button resources-button--quiet"
+                    onClick={disconnect}
+                    disabled={accountBusy}
+                  >
+                    {accountBusy ? '正在断开…' : '断开连接'}
+                  </button>
+                )}
+                {needsRebind && (
+                  <button
+                    type="button"
+                    className="resources-button"
+                    onClick={() => patch({ connectionRef: activeRef })}
+                  >
+                    绑定到当前账号
+                  </button>
+                )}
               </div>
-              <p className="resources-hint">
-                按本地模型实际支持的上下文选择。写作时提示词会按这个上限裁剪，填太大反而会被服务端截断。
-              </p>
-            </div>
-          ) : (
-            <label className="resources-field">
-              API Key
-              <input
-                type="password"
-                autoComplete="new-password"
-                value={form.apiKey}
-                onChange={e => patch({ apiKey: e.target.value })}
-                placeholder="填写服务商提供的密钥"
-              />
-              {initial && form.apiKey.includes('****') && (
-                <span className="resources-hint">密钥已保存。保留掩码即不修改；更换时输入新密钥。</span>
-              )}
-            </label>
-          )}
-          <div className="resources-field">
-            <label htmlFor="settings-model-name">模型名称</label>
-            <div className="resources-input-action">
-              <input
-                id="settings-model-name"
-                value={form.model}
-                onChange={e => patch({ model: e.target.value })}
-                placeholder={form.provider === 'gemini' ? 'gemini-3.8-flash' : 'gpt-4o / deepseek-chat'}
-              />
-              <button type="button" className="resources-button" onClick={fetchNames} disabled={fetching}>
-                {fetching ? '获取中…' : '获取列表'}
-              </button>
-            </div>
-            {fetchMsg && (
               <p className="resources-hint" role="status">
-                {fetchMsg}
+                {!codex || codexStatus?.state === 'unavailable'
+                  ? describeCodexError('CODEX_UNAVAILABLE')
+                  : !codexStatus
+                    ? '正在读取连接状态…'
+                    : needsRebind
+                      ? '此模型绑定了其他账号或工作区。保存前可选择改绑。'
+                      : activeRef
+                        ? `已连接 ${codexStatus.label || 'ChatGPT'}`
+                        : codexStatus.state === 'reconnect'
+                          ? describeCodexError('CODEX_RECONNECT')
+                          : '使用 Codex 设备码连接你的 ChatGPT 账号。'}
               </p>
-            )}
-            {modelNames.length > 0 && (
-              <div className="resources-model-options" role="group" aria-label="可用模型">
-                {modelNames.map(n => (
-                  <button type="button" key={n} aria-pressed={form.model === n} onClick={() => patch({ model: n })}>
-                    {n}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          {form.provider === 'gemini' ? (
-            <div className="resources-field">
-              <span id="thinking-label">思考等级</span>
-              <div className="resources-segmented" role="group" aria-labelledby="thinking-label">
-                {(['LOW', 'MEDIUM', 'HIGH'] as const).map(level => (
-                  <button
-                    type="button"
-                    key={level}
-                    aria-pressed={(form.thinkingLevel || 'MEDIUM') === level}
-                    onClick={() => patch({ thinkingLevel: level })}
-                  >
-                    {level === 'LOW' ? '低' : level === 'HIGH' ? '高' : '中'}
-                  </button>
-                ))}
-              </div>
-              <p className="resources-hint">Gemini 3.x 使用思考等级代替 temperature；等级越高，思考耗时通常越长。</p>
             </div>
-          ) : (
+          )}
+          {showFields && (
             <>
-              <div className="resources-field">
-                <span id="reasoning-label">思考强度 · Reasoning Effort</span>
-                <div className="resources-segmented" role="group" aria-labelledby="reasoning-label">
-                  {(['default', 'low', 'medium', 'high'] as const).map(level => (
-                    <button
-                      type="button"
-                      key={level}
-                      aria-pressed={(form.reasoningEffort || 'default') === level}
-                      onClick={() => patch({ reasoningEffort: level })}
-                    >
-                      {{ default: '默认', low: '低', medium: '中', high: '高' }[level]}
-                    </button>
-                  ))}
-                </div>
-                <p className="resources-hint">默认不发送 reasoning_effort 参数，其余选项由兼容服务决定是否支持。</p>
-              </div>
               <label className="resources-field">
-                创造性 · Temperature {form.temperature}
+                显示名称
                 <input
-                  type="range"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={form.temperature}
-                  onChange={e => patch({ temperature: Number(e.target.value) })}
+                  value={form.name}
+                  onChange={e => patch({ name: e.target.value })}
+                  placeholder="例如：日常写作 · DeepSeek"
+                  autoComplete="off"
                 />
               </label>
+              {!subscription && (
+                <>
+                  <label className="resources-field">
+                    服务地址 · API Base URL
+                    <input
+                      value={form.baseUrl}
+                      onChange={e => patch({ baseUrl: e.target.value })}
+                      placeholder="https://你的服务地址（兼容接口自动补 /v1）"
+                      spellCheck={false}
+                    />
+                  </label>
+                  <div className="resources-quick-links" aria-label="常用服务地址">
+                    {(form.provider === 'gemini' ? [GEMINI_BASE] : form.local ? LOCAL_QUICK : QUICK_BASES).map(q => (
+                      <button
+                        type="button"
+                        key={q.name}
+                        aria-pressed={form.baseUrl === q.baseUrl}
+                        onClick={() => patch({ baseUrl: q.baseUrl })}
+                      >
+                        {q.name}
+                      </button>
+                    ))}
+                  </div>
+                  {form.local ? (
+                    <div className="resources-field">
+                      <span id="local-ctx-label">上下文窗口</span>
+                      <div className="resources-segmented" role="group" aria-labelledby="local-ctx-label">
+                        {LOCAL_CONTEXT_OPTIONS.map(n => (
+                          <button
+                            type="button"
+                            key={n}
+                            aria-pressed={Number(form.contextTokens) === n}
+                            onClick={() => patch({ contextTokens: n })}
+                          >
+                            {n / 1024}k
+                          </button>
+                        ))}
+                      </div>
+                      <p className="resources-hint">
+                        按本地模型实际支持的上下文选择。写作时提示词会按这个上限裁剪，填太大反而会被服务端截断。
+                      </p>
+                    </div>
+                  ) : (
+                    <label className="resources-field">
+                      API Key
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={form.apiKey}
+                        onChange={e => patch({ apiKey: e.target.value })}
+                        placeholder="填写服务商提供的密钥"
+                      />
+                      {initial && form.apiKey.includes('****') && (
+                        <span className="resources-hint">密钥已保存。保留掩码即不修改；更换时输入新密钥。</span>
+                      )}
+                    </label>
+                  )}
+                </>
+              )}
+              <div className="resources-field">
+                <label htmlFor="settings-model-name">{subscription ? '模型 ID' : '模型名称'}</label>
+                <div className="resources-input-action">
+                  <input
+                    id="settings-model-name"
+                    value={form.model}
+                    onChange={e => patch({ model: e.target.value })}
+                    placeholder={
+                      subscription
+                        ? '填写订阅模型 ID'
+                        : form.provider === 'gemini'
+                          ? 'gemini-3.8-flash'
+                          : 'gpt-4o / deepseek-chat'
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="resources-button"
+                    onClick={fetchNames}
+                    disabled={fetching || (subscription && (!activeRef || needsRebind))}
+                  >
+                    {fetching ? '获取中…' : subscription ? '获取账号模型' : '获取列表'}
+                  </button>
+                </div>
+                {fetchMsg && (
+                  <p className="resources-hint" role="status">
+                    {fetchMsg}
+                  </p>
+                )}
+                {modelNames.length > 0 && (
+                  <div className="resources-model-options" role="group" aria-label="可用模型">
+                    {modelNames.map(n => (
+                      <button
+                        type="button"
+                        key={n.id}
+                        aria-pressed={form.model === n.id}
+                        onClick={() => patch({ model: n.id })}
+                        title={n.id}
+                      >
+                        {n.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {form.provider === 'gemini' ? (
+                <div className="resources-field">
+                  <span id="thinking-label">思考等级</span>
+                  <div className="resources-segmented" role="group" aria-labelledby="thinking-label">
+                    {(['LOW', 'MEDIUM', 'HIGH'] as const).map(level => (
+                      <button
+                        type="button"
+                        key={level}
+                        aria-pressed={(form.thinkingLevel || 'MEDIUM') === level}
+                        onClick={() => patch({ thinkingLevel: level })}
+                      >
+                        {level === 'LOW' ? '低' : level === 'HIGH' ? '高' : '中'}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="resources-hint">
+                    Gemini 3.x 使用思考等级代替 temperature；等级越高，思考耗时通常越长。
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="resources-field">
+                    <span id="reasoning-label">思考强度 · Reasoning Effort</span>
+                    <div className="resources-segmented" role="group" aria-labelledby="reasoning-label">
+                      {(['default', 'low', 'medium', 'high'] as const).map(level => (
+                        <button
+                          type="button"
+                          key={level}
+                          aria-pressed={(form.reasoningEffort || 'default') === level}
+                          onClick={() => patch({ reasoningEffort: level })}
+                        >
+                          {{ default: '默认', low: '低', medium: '中', high: '高' }[level]}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="resources-hint">
+                      {subscription
+                        ? '使用默认档位时由订阅模型决定。'
+                        : '默认不发送 reasoning_effort 参数，其余选项由兼容服务决定是否支持。'}
+                    </p>
+                  </div>
+                  {!subscription && (
+                    <label className="resources-field">
+                      创造性 · Temperature {form.temperature}
+                      <input
+                        type="range"
+                        min={0}
+                        max={1}
+                        step={0.1}
+                        value={form.temperature}
+                        onChange={e => patch({ temperature: Number(e.target.value) })}
+                      />
+                    </label>
+                  )}
+                </>
+              )}
             </>
           )}
         </fieldset>
@@ -331,11 +528,25 @@ function ModelForm({
           >
             取消
           </button>
-          <button type="submit" className="resources-button resources-button--primary" disabled={saving}>
+          <button
+            type="submit"
+            className="resources-button resources-button--primary"
+            disabled={saving || accountBusy || !showFields}
+          >
             {saving ? '保存中…' : '保存模型'}
           </button>
         </div>
       </form>
+      {showCodex && codex && (
+        <CodexConnectionDialog
+          codex={codex}
+          onClose={() => setShowCodex(false)}
+          onConnected={() => {
+            setShowCodex(false)
+            connectionChanged()
+          }}
+        />
+      )}
     </ModalShell>
   )
 }
@@ -1087,32 +1298,42 @@ export default function SettingsPage() {
                       </span>
                       <span>
                         <strong>{g.label}</strong>
-                        <span className="resources-row-detail">{g.baseUrl}</span>
+                        {g.baseUrl && <span className="resources-row-detail">{g.baseUrl}</span>}
                       </span>
                     </button>
                     <span className="resources-count">
                       {g.models.length} 个模型 ·{' '}
-                      {g.provider === 'gemini' ? 'Gemini' : g.models.every(m => m.local) ? '本地部署' : 'OpenAI 兼容'}
+                      {g.provider === 'chatgpt-subscription'
+                        ? '订阅'
+                        : g.provider === 'gemini'
+                          ? 'Gemini'
+                          : g.models.every(m => m.local)
+                            ? '本地部署'
+                            : 'OpenAI 兼容'}
                     </span>
                     <div className="resources-actions">
-                      <button
-                        className="resources-button resources-button--quiet"
-                        disabled={modelDisabled}
-                        onClick={() => {
-                          setRenameKey(g.key)
-                          setRenameDraft(g.label)
-                        }}
-                      >
-                        重命名
-                      </button>
-                      <button
-                        className="resources-button"
-                        disabled={modelDisabled}
-                        title="使用本站已保存的密钥，仅补充新模型"
-                        onClick={() => importGroup(g)}
-                      >
-                        {modelBusy === g.key ? '导入中…' : '导入新模型'}
-                      </button>
+                      {g.provider !== 'chatgpt-subscription' && (
+                        <>
+                          <button
+                            className="resources-button resources-button--quiet"
+                            disabled={modelDisabled}
+                            onClick={() => {
+                              setRenameKey(g.key)
+                              setRenameDraft(g.label)
+                            }}
+                          >
+                            重命名
+                          </button>
+                          <button
+                            className="resources-button"
+                            disabled={modelDisabled}
+                            title="使用本站已保存的密钥，仅补充新模型"
+                            onClick={() => importGroup(g)}
+                          >
+                            {modelBusy === g.key ? '导入中…' : '导入新模型'}
+                          </button>
+                        </>
+                      )}
                       <button
                         className="resources-button resources-button--quiet resources-button--danger"
                         disabled={modelDisabled}
@@ -1123,7 +1344,7 @@ export default function SettingsPage() {
                           )
                         }
                       >
-                        删除此站
+                        {g.provider === 'chatgpt-subscription' ? '删除此组模型' : '删除此站'}
                       </button>
                     </div>
                   </div>
@@ -1188,13 +1409,14 @@ export default function SettingsPage() {
                           </div>
                           <div className="resources-actions">
                             <span className="resources-hint">
-                              {testing === m.id
-                                ? '测试中'
-                                : testResult[m.id]
-                                  ? testResult[m.id].ok
-                                    ? '连接正常'
-                                    : '连接失败'
-                                  : '尚未测试'}
+                              {codexModelStateLabel(m.connectionState) ||
+                                (testing === m.id
+                                  ? '测试中'
+                                  : testResult[m.id]
+                                    ? testResult[m.id].ok
+                                      ? '连接正常'
+                                      : '连接失败'
+                                    : '尚未测试')}
                             </span>
                             <button className="resources-button" disabled={modelDisabled} onClick={() => test(m)}>
                               测试连接
@@ -1320,6 +1542,16 @@ export default function SettingsPage() {
       {showForm && (
         <ModelForm
           initial={editing}
+          onConnectionChanged={() => {
+            setTestResult(results =>
+              Object.fromEntries(
+                Object.entries(results).filter(
+                  ([id]) => !models.some(model => model.id === id && model.provider === 'chatgpt-subscription')
+                )
+              )
+            )
+            void load()
+          }}
           onCancel={() => setShowForm(false)}
           onDone={() => {
             setShowForm(false)
