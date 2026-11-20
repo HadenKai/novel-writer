@@ -571,16 +571,51 @@
   font-variant-numeric: tabular-nums;
 }
 
-.resources-scope .resources-subscription-usage summary {
-  cursor: pointer;
-  padding: 4px 7px;
+.resources-scope .resources-subscription-usage-trigger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 12px;
+  max-width: 100%;
+  padding: 5px 8px;
   border: 1px solid var(--line-soft);
   border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
 }
 
-.resources-scope .resources-subscription-usage summary:hover,
-.resources-scope .resources-subscription-usage[open] summary {
+.resources-scope .resources-subscription-usage-trigger:hover,
+.resources-scope .resources-subscription-usage-trigger[aria-expanded='true'] {
+  border-color: var(--line);
   color: var(--text);
+}
+
+.resources-scope .resources-subscription-usage-window {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.resources-scope .resources-subscription-usage-window strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.resources-scope .resources-usage-meter {
+  width: 44px;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-dim) 24%, var(--panel2));
+}
+
+.resources-scope .resources-usage-meter > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--gold);
 }
 
 .resources-scope .resources-subscription-usage-panel {
@@ -594,6 +629,33 @@
   border-radius: var(--r-md);
   background: var(--panel2);
   box-shadow: 0 8px 20px #0003;
+}
+
+.resources-scope .resources-subscription-usage-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+  color: var(--text);
+}
+
+.resources-scope .resources-subscription-usage-close {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.resources-scope .resources-subscription-usage-close:hover {
+  background: var(--panel);
+  color: var(--text);
 }
 
 .resources-scope .resources-subscription-usage-panel dl {

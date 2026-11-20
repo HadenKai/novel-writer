@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import type { CodexDesktopAPI, CodexUsageSnapshot } from '../lib/desktop'
 
 const percent = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 })
@@ -17,6 +17,10 @@ function windowLabel(seconds: number) {
 export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
   const [snapshot, setSnapshot] = useState<CodexUsageSnapshot | null>()
   const [refresh, setRefresh] = useState(0)
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelId = useId()
 
   useEffect(() => {
     let active = true
@@ -33,6 +37,26 @@ export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
     }
   }, [codex, refresh])
 
+  useEffect(() => {
+    if (!open) return
+    function dismissOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false)
+    }
+    function dismissOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        event.preventDefault()
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', dismissOutside, true)
+    document.addEventListener('keydown', dismissOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside, true)
+      document.removeEventListener('keydown', dismissOnEscape)
+    }
+  }, [open])
+
   const loading = snapshot === undefined
   const windows = snapshot?.windows ?? []
   const status = loading ? '正在读取用量…' : '用量暂不可用'
@@ -43,11 +67,51 @@ export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
     : status
 
   return (
-    <details className="resources-subscription-usage">
-      <summary aria-label={`Codex 用量，${summary}`}>
-        <span role="status">{summary}</span>
-      </summary>
-      <div className="resources-subscription-usage-panel">
+    <div className="resources-subscription-usage" ref={rootRef}>
+      <button
+        type="button"
+        ref={triggerRef}
+        className="resources-subscription-usage-trigger"
+        aria-label={`Codex 用量，${summary}`}
+        aria-controls={panelId}
+        aria-expanded={open}
+        onClick={() => setOpen(value => !value)}
+      >
+        {windows.length ? (
+          windows.map(window => (
+            <span key={window.durationSeconds} className="resources-subscription-usage-window">
+              <span>{windowLabel(window.durationSeconds)}剩余</span>
+              <span className="resources-usage-meter" aria-hidden="true">
+                <span style={{ width: `${window.remainingPercent}%` }} />
+              </span>
+              <strong>{percent.format(window.remainingPercent)}%</strong>
+            </span>
+          ))
+        ) : (
+          <span role="status">{status}</span>
+        )}
+      </button>
+      <div
+        id={panelId}
+        hidden={!open}
+        className="resources-subscription-usage-panel"
+        role="group"
+        aria-label="订阅用量详情"
+      >
+        <div className="resources-subscription-usage-heading">
+          <strong>用量详情</strong>
+          <button
+            type="button"
+            className="resources-subscription-usage-close"
+            aria-label="关闭用量详情"
+            onClick={() => {
+              setOpen(false)
+              triggerRef.current?.focus()
+            }}
+          >
+            ×
+          </button>
+        </div>
         {windows.length ? (
           <dl>
             {windows.map(window => (
@@ -78,6 +142,6 @@ export default function CodexUsage({ codex }: { codex: CodexDesktopAPI }) {
           刷新用量
         </button>
       </div>
-    </details>
+    </div>
   )
 }
