@@ -574,22 +574,31 @@
   font-size: 12px;
 }
 
+.resources-scope :is(.resources-subscription-email, .resources-subscription-plan) {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 38%, transparent);
+  border-radius: 999px;
+  font-weight: 650;
+  line-height: 1.4;
+}
+
 .resources-scope .resources-subscription-email {
   min-width: 0;
   overflow-wrap: anywhere;
   user-select: text;
+  background: color-mix(in srgb, currentColor 13%, transparent);
+  color: #24588f;
+}
+
+.dark .resources-scope .resources-subscription-email {
+  color: #91c2fb;
 }
 
 .resources-scope .resources-subscription-plan {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border: 1px solid color-mix(in srgb, var(--gold) 38%, transparent);
-  border-radius: 999px;
   background: var(--gold-soft);
   color: var(--gold);
-  font-weight: 650;
-  line-height: 1.4;
   white-space: nowrap;
 }
 
