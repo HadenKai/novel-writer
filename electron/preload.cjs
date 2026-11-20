@@ -2,6 +2,15 @@ const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('novelAPI', {
   pickFolder: () => ipcRenderer.invoke('pick-folder'),
+  codex: {
+    status: () => ipcRenderer.invoke('codex:status'),
+    start: () => ipcRenderer.invoke('codex:start'),
+    attempt: id => ipcRenderer.invoke('codex:attempt', id),
+    openVerification: id => ipcRenderer.invoke('codex:open-verification', id),
+    cancel: id => ipcRenderer.invoke('codex:cancel', id),
+    disconnect: () => ipcRenderer.invoke('codex:disconnect'),
+    listModels: () => ipcRenderer.invoke('codex:list-models')
+  },
   // 自绘标题栏的窗口控制
   winMinimize: () => ipcRenderer.invoke('win:minimize'),
   winMaximize: () => ipcRenderer.invoke('win:maximize'),
