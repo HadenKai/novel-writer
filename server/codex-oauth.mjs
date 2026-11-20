@@ -19,12 +19,37 @@ const errorMessages = {
   CODEX_NETWORK: '无法连接 ChatGPT 服务，请检查网络后重试。',
   CODEX_UNAVAILABLE: '当前环境无法使用 ChatGPT Subscription。',
   CODEX_DEVICE_DISABLED: '设备码授权未开放，请检查 ChatGPT 安全设置或工作区权限。',
+  CODEX_REGION_UNAVAILABLE: 'OpenAI 暂不支持当前请求的网络所在地区。',
+  CODEX_DEVICE_REQUEST_REJECTED: 'OpenAI 拒绝发放设备码，请检查网络后重试。',
   CODEX_INVALID_RESPONSE: 'ChatGPT 服务返回了无法处理的响应。',
   CODEX_STREAM_INTERRUPTED: 'ChatGPT 响应在完成前断开。'
 }
 
 export function codexError(code) {
   return Object.assign(new Error(errorMessages[code] || errorMessages.CODEX_INVALID_RESPONSE), { code })
+}
+
+export function isCodexRegionDenied(error) {
+  const code = typeof error === 'string' ? error : error?.code || error?.type
+  return code === 'unsupported_country_region_territory'
+}
+
+function authError(payload) {
+  return payload?.error || payload?.detail || payload
+}
+
+function deviceRequestFailure(status, payload) {
+  const error = authError(payload)
+  if (isCodexRegionDenied(error)) return 'CODEX_REGION_UNAVAILABLE'
+  if (status === 429) return 'CODEX_RATE_LIMIT'
+  if (status >= 500) return 'CODEX_NETWORK'
+  const detail = typeof error === 'string' ? error : error?.message
+  if (
+    /(device(?:[- ]code|[- ]auth(?:entication)?|[- ]authorization)).{0,35}(?:not enabled|disabled)/i.test(detail || '')
+  ) {
+    return 'CODEX_DEVICE_DISABLED'
+  }
+  return [401, 403, 404].includes(status) ? 'CODEX_DEVICE_REQUEST_REJECTED' : 'CODEX_INVALID_RESPONSE'
 }
 
 function jwtClaims(value) {
@@ -199,7 +224,8 @@ export async function createCodexAuth({
       consecutiveFailures = 0
       record.state = 'pending'
       if (reply.status === 403 || reply.status === 404) {
-        await reply.body?.cancel()
+        const detail = authError(await reply.json().catch(() => null))
+        if (isCodexRegionDenied(detail)) throw codexError('CODEX_REGION_UNAVAILABLE')
         continue
       }
       if (!reply.ok) throw codexError(reply.status === 429 ? 'CODEX_RATE_LIMIT' : 'CODEX_INVALID_RESPONSE')
@@ -219,7 +245,11 @@ export async function createCodexAuth({
         signal,
         true
       )
-      if (!exchange.ok) throw codexError(exchange.status === 429 ? 'CODEX_RATE_LIMIT' : 'CODEX_RECONNECT')
+      if (!exchange.ok) {
+        const detail = authError(await exchange.json().catch(() => null))
+        if (isCodexRegionDenied(detail)) throw codexError('CODEX_REGION_UNAVAILABLE')
+        throw codexError(exchange.status === 429 ? 'CODEX_RATE_LIMIT' : 'CODEX_RECONNECT')
+      }
       const next = tokenRecord(await json(exchange), now())
       await update(async () => {
         if (!isPending(record)) return
@@ -259,12 +289,8 @@ export async function createCodexAuth({
       )
       if (!isPending(record)) return publicAttempt(record)
       if (!reply.ok) {
-        const code = [401, 403].includes(reply.status)
-          ? 'CODEX_DEVICE_DISABLED'
-          : reply.status === 429
-            ? 'CODEX_RATE_LIMIT'
-            : 'CODEX_INVALID_RESPONSE'
-        throw codexError(code)
+        const payload = await reply.json().catch(() => null)
+        throw codexError(deviceRequestFailure(reply.status, payload))
       }
       const device = await json(reply)
       if (!isPending(record)) return publicAttempt(record)
@@ -303,7 +329,9 @@ export async function createCodexAuth({
     )
     const data = await json(response).catch(() => null)
     if (!response.ok) {
-      const code = typeof data?.error === 'string' ? data.error : data?.error?.code
+      const detail = authError(data)
+      if (isCodexRegionDenied(detail)) throw codexError('CODEX_REGION_UNAVAILABLE')
+      const code = typeof detail === 'string' ? detail : detail?.code
       if (response.status === 401 || ['invalid_grant', 'invalid_token', 'refresh_token_reused'].includes(code)) {
         await update(async () => {
           if (epoch !== version || current !== record) return

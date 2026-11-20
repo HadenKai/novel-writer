@@ -137,8 +137,11 @@ async function createWindow() {
       filePath: path.join(process.env.NOVEL_DATA_DIR, 'codex-credentials.enc'),
       safeStorage
     })
-    codexAuth = await createCodexAuth({ storage })
-    configureCodexClient(createCodexClient({ auth: codexAuth, appVersion: app.getVersion() }))
+    // OAuth and Responses follow the desktop's configured proxy, with an isolated session.
+    const codexNetwork = session.fromPartition('novel-codex-network')
+    const fetchImpl = (url, options) => codexNetwork.fetch(url, { ...options, credentials: 'omit' })
+    codexAuth = await createCodexAuth({ storage, fetchImpl })
+    configureCodexClient(createCodexClient({ auth: codexAuth, fetchImpl, appVersion: app.getVersion() }))
   }
   const { startServer, abortAllJobs, drainJobs } = await import('../server/app.mjs')
   stopAllJobs = abortAllJobs

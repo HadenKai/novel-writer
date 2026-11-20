@@ -1,4 +1,4 @@
-import { codexError } from './codex-oauth.mjs'
+import { codexError, isCodexRegionDenied } from './codex-oauth.mjs'
 
 export const CODEX_PROVIDER = 'chatgpt-subscription'
 const BASE = 'https://chatgpt.com/backend-api/codex'
@@ -57,6 +57,7 @@ function requestBody({ model, messages }, reasoning) {
 }
 
 function responseFailure(status, error) {
+  if (isCodexRegionDenied(error)) return codexError('CODEX_REGION_UNAVAILABLE')
   const code = String(error?.code || error?.type || '').toLowerCase()
   const message = typeof error === 'string' ? error : String(error?.message || '')
   if (status === 429 || /usage_limit|rate_limit|quota/.test(code) || /(?:usage|rate) limit|quota/i.test(message)) {

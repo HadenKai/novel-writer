@@ -39,7 +39,9 @@ const CODEX_HINT: Record<string, string> = {
   CODEX_RATE_LIMIT: 'ChatGPT 订阅用量已达上限，请查看 ChatGPT 用量。',
   CODEX_NETWORK: '无法连接 ChatGPT 服务，请检查网络后重试。',
   CODEX_UNAVAILABLE: '当前环境无法使用 ChatGPT Subscription。',
-  CODEX_DEVICE_DISABLED: '设备码授权未开放，请检查 ChatGPT 安全设置或工作区权限。'
+  CODEX_DEVICE_DISABLED: '设备码授权未开放，请检查 ChatGPT 安全设置或工作区权限。',
+  CODEX_REGION_UNAVAILABLE: 'OpenAI 暂不支持当前请求的网络所在地区。',
+  CODEX_DEVICE_REQUEST_REJECTED: 'OpenAI 拒绝发放设备码，请检查网络后重试。'
 }
 
 export function describeCodexError(code?: string, fallback = '无法完成 ChatGPT 授权，请重试。'): string {

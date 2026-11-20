@@ -119,6 +119,7 @@ test('codex refreshes a pre-stream 401 once, reports quotas or permissions, and 
   for (const [status, code, body = {}] of [
     [401, 'CODEX_RECONNECT'],
     [403, 'CODEX_MODEL_FORBIDDEN'],
+    [403, 'CODEX_REGION_UNAVAILABLE', { error: { code: 'unsupported_country_region_territory' } }],
     [429, 'CODEX_RATE_LIMIT'],
     [401, 'CODEX_MODEL_FORBIDDEN', { error: { code: 'workspace_not_authorized' } }],
     [401, 'CODEX_MODEL_FORBIDDEN', { error: { code: 'insufficient_scope' } }],

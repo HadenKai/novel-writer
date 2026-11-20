@@ -16,7 +16,7 @@ const jwt = (now, accountId = 'workspace-A', duration = 1000) =>
   ).toString('base64url') +
   '.signature'
 
-function fixture({ poll, exchange, refresh, deadline = 60, initialNow = 1_000_000 } = {}) {
+function fixture({ issue, poll, exchange, refresh, deadline = 60, initialNow = 1_000_000 } = {}) {
   let now = initialNow
   let record = null
   let writes = 0
@@ -45,7 +45,9 @@ function fixture({ poll, exchange, refresh, deadline = 60, initialNow = 1_000_00
       calls.push(kind)
       assert.equal(options.redirect, 'error')
       if (kind.endsWith('/usercode'))
-        return json({ user_code: 'ABCD-ABCD', device_auth_id: 'hidden', expires_in: deadline, interval: 3 })
+        return (
+          issue?.() ?? json({ user_code: 'ABCD-ABCD', device_auth_id: 'hidden', expires_in: deadline, interval: 3 })
+        )
       if (kind.endsWith('/deviceauth/token'))
         return poll?.(calls) ?? json({ authorization_code: 'auth-code', code_verifier: 'hidden' })
       if (new URLSearchParams(options.body).get('grant_type') === 'refresh_token')
@@ -71,6 +73,27 @@ async function waitFor(auth, id, state) {
   }
   assert.equal(auth.attempt(id)?.state, state)
 }
+
+test('device-code issuance distinguishes region, client rejection, and explicit device policy', async () => {
+  for (const [status, payload, code] of [
+    [
+      403,
+      { error: { code: 'unsupported_country_region_territory', message: 'Location is not supported' } },
+      'CODEX_REGION_UNAVAILABLE'
+    ],
+    [403, {}, 'CODEX_DEVICE_REQUEST_REJECTED'],
+    [401, {}, 'CODEX_DEVICE_REQUEST_REJECTED'],
+    [403, { detail: 'Device code login is not enabled' }, 'CODEX_DEVICE_DISABLED']
+  ]) {
+    const f = fixture({ issue: () => json(payload, status) })
+    const a = await f.auth
+    const attempt = await a.start()
+    assert.equal(attempt.state, 'error')
+    assert.equal(attempt.code, code)
+    assert.equal(attempt.userCode, undefined)
+    assert.equal(f.calls.length, 1)
+  }
+})
 
 test('device authorization polls pending states and persists only the current attempt', async () => {
   const f = fixture({
