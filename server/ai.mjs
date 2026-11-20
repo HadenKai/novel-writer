@@ -224,7 +224,7 @@ G. 写作模板、已选 Skill、作者文风和通用质量建议。
 
 const withPriority = text => `${PRIORITY_RULE}\n\n${text}`
 
-export function writingContract(novel, chapterIndex, kind = 'write') {
+export function writingContract(novel, chapterIndex, kind = 'write', extraPrompt = '') {
   const total = Math.max(0, ...(novel.outline || []).map(o => Number(o.index) || 0), Number(novel.chapterCount) || 0)
   const cur = (novel.outline || []).find(o => o.index === chapterIndex)
   const author = cur?.customPrompt?.trim()
@@ -234,7 +234,7 @@ export function writingContract(novel, chapterIndex, kind = 'write') {
 【本次任务合同】
 任务：${kind === 'continue' ? '从现有正文断点续写' : kind === 'polish' ? '保持情节不变整章润色' : kind === 'revise' ? '针对作者问题精准修改' : kind === 'deai' ? '保持情节不变降低机器感' : '按本章框架创作正文'}
 当前作品：《${novel.title}》；当前章：第 ${chapterIndex} 章；全书规划：${total || '未定'} 章。
-作者本章专属指令：${author || '（无）'}
+作者本章专属指令：${author || '（无）'}${extraPrompt ? '\n作者本次起草补充要求：' + extraPrompt : ''}
 作者全书自定义要求：${custom || '（无）'}
 输出边界：只输出本任务要求的正文成品，不输出分析、规则复述、章节标题、字数统计或修改说明。
 完成前自检：章号与上下文一致；逐一核对人物姓名、身份、性格、外貌和已发生事实；未解决线索没有无故消失；人物状态不凭空改变；本章任务有实际推进；结尾回应指定钩子。`
@@ -892,7 +892,7 @@ export function chapterMessages(novel, chapterIndex, opts = {}) {
   // 拼装：写作合同与本章任务是硬约束（keep），其余按影响面从小到大让路。
   // 逐章写作是最吃上下文的场景：200 章的书光前文脉络就够撑满。
   const sections = [
-    section('合同', writingContract(novel, chapterIndex, 'write'), { keep: true }),
+    section('合同', writingContract(novel, chapterIndex, 'write', opts.extraPrompt), { keep: true }),
     section('开篇说明', `你正在写小说《${novel.title}》的第 ${chapterIndex} 章。`),
     section(
       '设定',

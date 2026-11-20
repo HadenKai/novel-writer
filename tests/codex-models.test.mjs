@@ -22,6 +22,7 @@ test(
     let state = { state: 'connected', connectionRef: ref }
     let outcome = 'probe'
     const modelsHit = []
+    const requests = []
     let catalog = []
     let catalogCalls = 0
     let pauseCatalog
@@ -45,6 +46,7 @@ test(
           assert.equal(url, 'https://chatgpt.com/backend-api/codex/responses')
           const body = JSON.parse(options.body)
           modelsHit.push(body.model)
+          requests.push(body)
           const content =
             outcome === 'draft'
               ? chapterText
@@ -253,12 +255,21 @@ test(
           novelId: book.id,
           chapterIndex: 1,
           modelId: 'codex-a',
+          extraPrompt: '许澄从旧灯塔捡到寄给明天的信。',
           previewOnly: true
         })
       ).json()
       const written = await jobResult(chapter.jobId)
       assert.equal(written.status, 'done', written.error)
       assert.match(written.stream, /林砚推开门/)
+      const draftRequest = requests.at(-1)
+      assert.equal(draftRequest.model, 'cla-test')
+      assert.ok(
+        draftRequest.input.some(message =>
+          message.content.some(part => part.text?.includes('许澄从旧灯塔捡到寄给明天的信。'))
+        ),
+        'ordinary Codex draft request must carry the author’s extra prompt'
+      )
       await req('/api/novels/' + book.id + '/import', { text: '第一章 开端\n第一段。\n\n第二段。', replace: true })
       outcome = 'chat'
       const chat = await (

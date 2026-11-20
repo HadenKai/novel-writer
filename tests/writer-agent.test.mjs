@@ -34,7 +34,7 @@ const REVISED = `雨停的时候，码头的灯还亮着。林砚收起伞，抖
 他抬头看向黑沉沉的海面。船早没了，可汽笛声又响了一次。`
 
 test('写作 Agent：本地模型零密钥接入 + 四阶段成稿', { timeout: 60000 }, async () => {
-  const seen = { auth: [], systems: [] }
+  const seen = { auth: [], systems: [], prompts: [] }
   const relay = http.createServer((req, res) => {
     if (!req.url.includes('/chat/completions')) return res.writeHead(404).end('no')
     let raw = ''
@@ -44,6 +44,7 @@ test('写作 Agent：本地模型零密钥接入 + 四阶段成稿', { timeout: 
       seen.auth.push(req.headers.authorization || '')
       const system = String(payload.messages?.find(m => m.role === 'system')?.content || '')
       seen.systems.push(system)
+      seen.prompts.push(String(payload.messages?.find(m => m.role === 'user')?.content || ''))
 
       let content
       if (system.includes('小说策划编辑')) {
@@ -116,6 +117,7 @@ test('写作 Agent：本地模型零密钥接入 + 四阶段成稿', { timeout: 
       chapterIndex: 1,
       modelId: model.id,
       agent: true,
+      extraPrompt: '保留船票背面画着三枚蓝月的细节。',
       previewOnly: true
     })
     assert.equal(started.status, 202)
@@ -136,6 +138,9 @@ test('写作 Agent：本地模型零密钥接入 + 四阶段成稿', { timeout: 
     assert.doesNotMatch(seen.systems[1], /编辑/, '第二次调用应是起草')
     assert.match(seen.systems[2], /审稿编辑/, '第三次调用应是自检')
     assert.match(seen.systems[3], /改稿编辑/, '第四次调用应是修订')
+    for (const [i, prompt] of seen.prompts.entries()) {
+      assert.ok(prompt.includes('保留船票背面画着三枚蓝月的细节。'), `第 ${i + 1} 阶段应传入本次补充要求`)
+    }
     assert.equal(job.revised, true)
     assert.equal(job.brief?.beats?.length, 3, '方案应带 3 个节拍')
     // 审稿返回 2 条，其中 1 条是 low；工作流只把 high/medium 当作必改项
